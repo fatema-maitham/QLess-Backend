@@ -132,6 +132,11 @@ Admins manage the overall platform, including users, businesses, categories, rev
 ![QLess Entity Relationship Diagram](plan/QLess-ERD.png)
 
 ---
+## Component Hierarchy
+
+![QLess Component Hierarchy Diagram](plan/QLess-CHD.png)
+
+---
 
 ## API Routes
 Base URL: `/api/v1`
