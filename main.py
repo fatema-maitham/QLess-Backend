@@ -23,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_PREFIX = "/api/v1"
+API_PREFIX = "/api"
 
 app.include_router(AuthRouter, prefix=API_PREFIX)
 app.include_router(CategoryRouter, prefix=API_PREFIX)

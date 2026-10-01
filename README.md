@@ -139,7 +139,7 @@ Admins manage the overall platform, including users, businesses, categories, rev
 ---
 
 ## API Routes
-Base URL: `/api/v1`
+Base URL: `/api`
 
 Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
