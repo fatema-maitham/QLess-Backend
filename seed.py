@@ -11,6 +11,7 @@ import models  # noqa: F401  (loads every model so all tables are known)
 from data.role_data import create_roles
 from data.user_data import create_users
 from data.category_data import create_categories
+from data.business_data import create_businesses
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -33,7 +34,7 @@ try:
     categories = create_categories()
     db.add_all(categories.values())
 
-    # Person B and Person A add businesses, branches, queues, etc. below this line
+    db.add_all(create_businesses(users, categories))
 
     db.commit()
     print("Database seeding complete! 👋")
