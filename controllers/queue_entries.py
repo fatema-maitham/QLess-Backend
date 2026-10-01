@@ -13,6 +13,7 @@ from dependencies.queue_access import check_owner_or_staff, find_queue, owns_bus
 from dependencies.roles import require_customer, require_owner_or_staff
 from models.queue_entry import QueueEntryModel
 from models.user import UserModel
+from realtime.queue_updates import broadcast, queue_message
 from serializers.queue_entry import (
     EntryStatus,
     MyQueueEntriesSchema,
@@ -148,6 +149,7 @@ def create_queue_entry(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Someone joined at the same time. Please try again")
 
     db.refresh(entry)
+    broadcast(queue.id, queue_message(db, queue, "entry_joined", entry_id=entry.id))
     return entry_out(db, entry)
 
 
@@ -277,10 +279,16 @@ def update_queue_entry(
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can't change this ticket")
 
-    # Later: broadcast the change over the WebSocket here (Real-time)
-
     db.commit()
     db.refresh(entry)
+
+    broadcast(
+        entry.queue_id,
+        queue_message(
+            db, entry.queue, "entry_updated",
+            entry_id=entry.id, entry_status=entry.status, on_the_way=entry.on_the_way,
+        ),
+    )
     return entry_out(db, entry)
 
 
@@ -303,4 +311,5 @@ def delete_queue_entry(
     entry.on_the_way = False
     entry.cancelled_at = func.now()
     db.commit()
+    broadcast(entry.queue_id, queue_message(db, entry.queue, "entry_left", entry_id=entry.id))
     return {"message": "You left the queue"}
