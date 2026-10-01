@@ -16,6 +16,7 @@ from models.queue import QueueModel
 from models.queue_entry import QueueEntryModel
 from models.service import ServiceModel
 from models.user import UserModel
+from realtime.queue_updates import broadcast, queue_message
 from serializers.queue import (
     CallNextResponseSchema,
     QueueAnalyticsSchema,
@@ -160,6 +161,10 @@ def update_queue(
 
     db.commit()
     db.refresh(queue)
+
+    event = "queue_status_changed" if new_status is not None else "queue_updated"
+    broadcast(queue.id, queue_message(db, queue, event))
+
     return queue_out(db, queue)
 
 
@@ -183,8 +188,10 @@ def delete_queue(
             detail="People are still waiting in this queue. Close it and serve them first",
         )
 
+    queue_id = queue.id
     db.delete(queue)
     db.commit()
+    broadcast(queue_id, {"type": "queue_deleted", "queue_id": queue_id})
     return {"message": "Queue deleted"}
 
 
@@ -216,11 +223,18 @@ def call_next(
     queue.current_number = entry.queue_number
 
     # Later: create a "called" notification here (Notifications)
-    # Later: broadcast the change over the WebSocket here (Real-time)
 
     db.commit()
     db.refresh(entry)
     db.refresh(queue)
+
+    broadcast(
+        queue.id,
+        queue_message(
+            db, queue, "entry_called",
+            entry_id=entry.id, user_id=entry.user_id, queue_number=entry.queue_number,
+        ),
+    )
 
     return {
         "message": f"Called number {entry.queue_number}",
