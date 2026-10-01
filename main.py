@@ -18,6 +18,7 @@ from controllers.queue_entries import router as QueueEntryRouter
 from controllers.realtime import router as RealtimeRouter
 from controllers.notifications import router as NotificationRouter
 from controllers.admin_suspicious_activity import router as SuspiciousActivityRouter
+from controllers.branches import router as BranchRouter
 
 app = FastAPI(
     title="QLess API",
