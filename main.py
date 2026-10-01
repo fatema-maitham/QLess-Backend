@@ -17,6 +17,7 @@ from controllers.queues import router as QueueRouter
 from controllers.queue_entries import router as QueueEntryRouter
 from controllers.realtime import router as RealtimeRouter
 from controllers.notifications import router as NotificationRouter
+from controllers.admin_suspicious_activity import router as SuspiciousActivityRouter
 
 app = FastAPI(
     title="QLess API",
@@ -48,6 +49,7 @@ app.include_router(QueueRouter, prefix=API_PREFIX)
 app.include_router(QueueEntryRouter, prefix=API_PREFIX)
 app.include_router(RealtimeRouter, prefix=API_PREFIX)
 app.include_router(NotificationRouter, prefix=API_PREFIX)
+app.include_router(SuspiciousActivityRouter, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
