@@ -26,7 +26,7 @@ from controllers.favorites import router as FavoriteRouter
 from controllers.services import router as ServiceRouter
 from controllers.hours import router as HoursRouter
 from controllers.staff import router as StaffRouter
-
+from controllers.announcements import router as AnnouncementRouter
 app = FastAPI(
     title="QLess API",
     description=(
@@ -66,6 +66,7 @@ app.include_router(FavoriteRouter, prefix=API_PREFIX)
 app.include_router(ServiceRouter, prefix=API_PREFIX)
 app.include_router(HoursRouter, prefix=API_PREFIX)
 app.include_router(StaffRouter, prefix=API_PREFIX)
+app.include_router(AnnouncementRouter, prefix=API_PREFIX)
 
 @app.get("/health", tags=["Health"])
 def health_check():
