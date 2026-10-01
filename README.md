@@ -324,8 +324,6 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 ### Admin Routes
 
-All routes require the **Admin** role. Every write action creates an `ADMIN_AUDIT_LOG` record.
-
 | HTTP Method | Controller                 | Response | URI                                     | Use Case                                              |
 | ----------- | -------------------------- | -------: | --------------------------------------- | ----------------------------------------------------- |
 | GET         | dashboard                  |      200 | `/admin/dashboard`                      | Platform statistics                                   |
