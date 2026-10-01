@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Controllers
 from controllers.auth import router as AuthRouter
+from controllers.users import router as UsersRouter
 
 app = FastAPI(title="QLess API")
 
@@ -25,6 +26,7 @@ app.add_middleware(
 API_PREFIX = "/api/v1"
 
 app.include_router(AuthRouter, prefix=API_PREFIX)
+app.include_router(UsersRouter, prefix=API_PREFIX)
 
 
 @app.get("/health")
