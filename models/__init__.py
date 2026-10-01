@@ -1,8 +1,24 @@
-from .base import BaseModel
+from .base import Base, BaseModel
 
-# Import submodules so their classes register with the mapper registry.
-# Import modules, not classes, to avoid circular imports between request/property/notification.
-from . import user
-# add future models here as needed
+# Import every model module so SQLAlchemy and Alembic can see all tables.
+from . import (
+    role,
+    user,
+    category,
+    business,
+    branch,
+    service,
+    operating_hour,
+    staff,
+    announcement,
+    queue,
+    queue_entry,
+    booking,
+    notification,
+    review,
+    favorite,
+    suspicious_activity,
+    audit_log,
+)
 
-__all__ = ["BaseModel"]
+__all__ = ["Base", "BaseModel"]
