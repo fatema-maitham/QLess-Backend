@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Controllers
 from controllers.auth import router as AuthRouter
+from controllers.users import router as UsersRouter
 from controllers.categories import router as CategoryRouter
 
 app = FastAPI(title="QLess API")
@@ -24,10 +25,3 @@ app.add_middleware(
 )
 
 API_PREFIX = "/api"
-
-app.include_router(AuthRouter, prefix=API_PREFIX)
-app.include_router(CategoryRouter, prefix=API_PREFIX)
-
-@app.get("/health")
-def health_check():
-    return {"message": "Api is running"}
