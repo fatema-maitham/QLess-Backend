@@ -20,7 +20,8 @@ from serializers.queue_entry import (
     QueueEntrySchema,
     QueueEntryUpdateSchema,
 )
-from services.notifications import notify
+from services.no_shows import handle_no_show
+from services.suspicious_activity import check_frequent_cancellations
 
 router = APIRouter(tags=["Queue Entries"])
 
@@ -230,7 +231,7 @@ def customer_update(entry: QueueEntryModel, updates: dict):
     entry.checked_in_at = func.now()
 
 
-def manager_update(entry: QueueEntryModel, updates: dict):
+def manager_update(db: Session, entry: QueueEntryModel, updates: dict):
     if "on_the_way" in updates:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the customer can mark 'on the way'")
 
@@ -255,15 +256,7 @@ def manager_update(entry: QueueEntryModel, updates: dict):
         entry.completed_at = func.now()
 
     elif new_status == "no_show":
-        entry.no_show_at = func.now()
-        entry.user.no_show_count += 1
-        notify(
-            entry.user,
-            "no_show",
-            "You missed your turn",
-            f"Ticket #{entry.queue_number} at {entry.queue.name} was marked as a no-show.",
-        )
-        # Later: warning + restriction after repeated no-shows (No-show step)
+        handle_no_show(db, entry)
 
 
 @router.patch("/queue-entries/{entry_id}", response_model=QueueEntrySchema)
@@ -282,7 +275,7 @@ def update_queue_entry(
     if entry.user_id == user.id:
         customer_update(entry, updates)
     elif can_manage(db, user, entry):
-        manager_update(entry, updates)
+        manager_update(db, entry, updates)
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can't change this ticket")
 
@@ -317,6 +310,11 @@ def delete_queue_entry(
     entry.status = "cancelled"
     entry.on_the_way = False
     entry.cancelled_at = func.now()
+
+    # Save the cancel first so it is counted, then check for too many cancels
+    db.flush()
+    check_frequent_cancellations(db, user, entry.queue)
+
     db.commit()
     broadcast(entry.queue_id, queue_message(db, entry.queue, "entry_left", entry_id=entry.id))
     return {"message": "You left the queue"}
