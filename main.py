@@ -20,6 +20,8 @@ from controllers.realtime import router as RealtimeRouter
 from controllers.notifications import router as NotificationRouter
 from controllers.admin_suspicious_activity import router as SuspiciousActivityRouter
 from controllers.bookings import router as BookingRouter
+from controllers.reviews import router as ReviewRouter
+from controllers.favorites import router as FavoriteRouter
 
 app = FastAPI(
     title="QLess API",
@@ -54,6 +56,8 @@ app.include_router(RealtimeRouter, prefix=API_PREFIX)
 app.include_router(NotificationRouter, prefix=API_PREFIX)
 app.include_router(SuspiciousActivityRouter, prefix=API_PREFIX)
 app.include_router(BookingRouter, prefix=API_PREFIX)
+app.include_router(ReviewRouter, prefix=API_PREFIX)
+app.include_router(FavoriteRouter, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
