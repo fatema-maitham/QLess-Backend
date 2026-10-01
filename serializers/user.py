@@ -1,26 +1,27 @@
-# serializers/user.py
+from datetime import datetime
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 
-# Form Validations
-class UserRegistrationSchema(BaseModel):
-    username: str  # User's unique name
-    email: str  # User's email address
-    password: str  # Plain text password for user registration (will be hashed before saving)
 
-class UserLoginSchema(BaseModel):
-    username: str  # User's unique name
-    password: str  # Plain text password for user registration (will be hashed before saving)
-
-# Response Schemas
 class UserSchema(BaseModel):
+    """What the API sends back about a user. Never includes the password."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    username: str
+    name: str
     email: str
+    phone: Optional[str] = None
+    profile_image: Optional[str] = None
+    role: str
+    no_show_count: int
+    restricted_until: Optional[datetime] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
-
-class UserTokenSchema(BaseModel):
-    token: str
-    message: str
+    # The model gives us a RoleModel; send just its name ("customer", "owner", ...)
+    @field_validator("role", mode="before")
+    @classmethod
+    def role_to_name(cls, value):
+        return value.name if hasattr(value, "name") else value

@@ -1,17 +1,20 @@
 from models.user import UserModel
 
-def create_test_users():
-    user1 = UserModel(username="arjun_dev", email="arjun@devmail.in")
-    user1.set_password("123")
-    user2 = UserModel(username="emma_johnson", email="emma.johnson@email.com")
-    user2.set_password("123")
-    user3 = UserModel(username="fatima_ali", email="fatima.ali@mail.ae")
-    user3.set_password("123")
-    user4 = UserModel(username="lucas_silva", email="lucas.silva@correo.br")
-    user4.set_password("123")
-    user5 = UserModel(username="elena_popov", email="elena.popov@mail.ru")
-    user5.set_password("123")
+# Every test user has the password: password123
 
-    return [user1, user2, user3, user4, user5]
 
-user_list = create_test_users()
+def create_users(roles):
+    people = [
+        ("admin", "Admin User", "admin@qless.com", "33000001"),
+        ("owner", "Owner User", "owner@qless.com", "33000002"),
+        ("staff", "Staff User", "staff@qless.com", "33000003"),
+        ("customer", "Customer User", "customer@qless.com", "33000004"),
+    ]
+
+    users = {}
+    for role_name, name, email, phone in people:
+        user = UserModel(name=name, email=email, phone=phone, role=roles[role_name])
+        user.set_password("password123")
+        users[role_name] = user
+
+    return users
