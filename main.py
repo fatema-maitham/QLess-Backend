@@ -12,10 +12,11 @@ from controllers.auth import router as AuthRouter
 from controllers.users import router as UsersRouter
 from controllers.categories import router as CategoryRouter
 from controllers.browse import router as BrowseRouter
+from controllers.businesses import router as BusinessRouter
 from controllers.queues import router as QueueRouter
 from controllers.queue_entries import router as QueueEntryRouter
 from controllers.realtime import router as RealtimeRouter
-from controllers.businesses import router as BusinessRouter
+from controllers.notifications import router as NotificationRouter
 
 app = FastAPI(
     title="QLess API",
@@ -25,6 +26,7 @@ app = FastAPI(
         "sends live updates when someone joins, leaves, is called, or the queue status changes."
     ),
 )
+
 # Allow the React dev server(s) listed in CORS_ORIGINS to call the API
 origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
 
@@ -41,10 +43,11 @@ app.include_router(AuthRouter, prefix=API_PREFIX)
 app.include_router(UsersRouter, prefix=API_PREFIX)
 app.include_router(CategoryRouter, prefix=API_PREFIX)
 app.include_router(BrowseRouter, prefix=API_PREFIX)
+app.include_router(BusinessRouter, prefix=API_PREFIX)
 app.include_router(QueueRouter, prefix=API_PREFIX)
 app.include_router(QueueEntryRouter, prefix=API_PREFIX)
 app.include_router(RealtimeRouter, prefix=API_PREFIX)
-app.include_router(BusinessRouter, prefix=API_PREFIX)
+app.include_router(NotificationRouter, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
