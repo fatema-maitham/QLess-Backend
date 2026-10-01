@@ -17,8 +17,14 @@ from controllers.queue_entries import router as QueueEntryRouter
 from controllers.realtime import router as RealtimeRouter
 from controllers.businesses import router as BusinessRouter
 
-app = FastAPI(title="QLess API")
-
+app = FastAPI(
+    title="QLess API",
+    description=(
+        "**Real-time (WebSocket, not shown below):** "
+        "`ws://127.0.0.1:8000/api/ws/queues/{queue_id}?token=<JWT>` "
+        "sends live updates when someone joins, leaves, is called, or the queue status changes."
+    ),
+)
 # Allow the React dev server(s) listed in CORS_ORIGINS to call the API
 origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
 
