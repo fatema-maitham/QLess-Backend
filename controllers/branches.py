@@ -11,6 +11,7 @@ from models.branch import BranchModel
 from models.business import BusinessModel
 from models.user import UserModel
 from serializers.branch import BranchCreateSchema, BranchSchema, BranchUpdateSchema
+from services.opening_hours import branch_is_open_now
 
 router = APIRouter(tags=["Branches"])
 
@@ -60,8 +61,10 @@ def get_branches(
     if not manager:
         query = query.filter(BranchModel.is_active.is_(True))
 
-    return query.order_by(BranchModel.name).all()
-
+    branches = query.order_by(BranchModel.name).all()
+    for branch in branches:
+        branch.is_open_now = branch_is_open_now(branch)
+    return branches
 
 @router.post(
     "/businesses/{business_id}/branches",
@@ -100,6 +103,7 @@ def show_branch(
     if not is_public and not can_manage(current_user, branch.business):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Branch not found")
 
+    branch.is_open_now = branch_is_open_now(branch)
     return branch
 
 
