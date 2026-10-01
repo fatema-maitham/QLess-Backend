@@ -13,6 +13,7 @@ from controllers.users import router as UsersRouter
 from controllers.categories import router as CategoryRouter
 from controllers.browse import router as BrowseRouter
 from controllers.queues import router as QueueRouter
+from controllers.queue_entries import router as QueueEntryRouter
 
 app = FastAPI(title="QLess API")
 
@@ -33,6 +34,7 @@ app.include_router(UsersRouter, prefix=API_PREFIX)
 app.include_router(CategoryRouter, prefix=API_PREFIX)
 app.include_router(BrowseRouter, prefix=API_PREFIX)
 app.include_router(QueueRouter, prefix=API_PREFIX)
+app.include_router(QueueEntryRouter, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
