@@ -36,5 +36,6 @@ class BranchSchema(BaseModel):
     email: Optional[str] = None
     image: Optional[str] = None
     is_active: bool
+    is_open_now: bool = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
