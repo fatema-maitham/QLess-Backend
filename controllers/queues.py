@@ -24,6 +24,7 @@ from serializers.queue import (
     QueueSchema,
     QueueUpdateSchema,
 )
+from services.notifications import notify, notify_turn_approaching
 
 router = APIRouter(tags=["Queues"])
 
@@ -222,7 +223,17 @@ def call_next(
     entry.called_at = func.now()
     queue.current_number = entry.queue_number
 
-    # Later: create a "called" notification here (Notifications)
+    notify(
+        entry.user,
+        "called",
+        "It's your turn!",
+        f"Ticket #{entry.queue_number} at {queue.name}: please come to the counter "
+        f"within {queue.no_show_grace_minutes} minutes.",
+    )
+
+    # Save the "called" change first so the next waiting people are counted correctly
+    db.flush()
+    notify_turn_approaching(db, queue)
 
     db.commit()
     db.refresh(entry)
