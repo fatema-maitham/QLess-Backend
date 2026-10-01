@@ -20,6 +20,7 @@ from serializers.queue_entry import (
     QueueEntrySchema,
     QueueEntryUpdateSchema,
 )
+from services.notifications import notify
 
 router = APIRouter(tags=["Queue Entries"])
 
@@ -256,7 +257,13 @@ def manager_update(entry: QueueEntryModel, updates: dict):
     elif new_status == "no_show":
         entry.no_show_at = func.now()
         entry.user.no_show_count += 1
-        # Later: warning notification + restriction (No-show step)
+        notify(
+            entry.user,
+            "no_show",
+            "You missed your turn",
+            f"Ticket #{entry.queue_number} at {entry.queue.name} was marked as a no-show.",
+        )
+        # Later: warning + restriction after repeated no-shows (No-show step)
 
 
 @router.patch("/queue-entries/{entry_id}", response_model=QueueEntrySchema)
