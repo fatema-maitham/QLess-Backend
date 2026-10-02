@@ -18,8 +18,8 @@ psycopg = "*"
 websockets = "*"
 
 [dev-packages]
-pytest = "*"
 starlette = "*"
+pytest = "*"
 httpx = "*"
 
 [requires]
