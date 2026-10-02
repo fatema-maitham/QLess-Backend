@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from dotenv import load_dotenv
@@ -21,9 +21,9 @@ db = SessionLocal()
 try:
     print("Seeding the database...")
 
-    # Empty every table first (children before parents) so seeding can be re-run
-    for table in reversed(Base.metadata.sorted_tables):
-        db.execute(table.delete())
+    # Empty every table and restart ids at 1 so seeding can be re-run
+    tables = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
+    db.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
 
     roles = create_roles()
     db.add_all(roles.values())
