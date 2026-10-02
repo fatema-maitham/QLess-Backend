@@ -8,6 +8,7 @@ from dependencies.roles import require_admin
 from models.category import CategoryModel
 from models.user import UserModel
 from serializers.category import CategoryCreateSchema, CategorySchema, CategoryUpdateSchema
+from services.audit_log import log_admin_action
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -43,6 +44,8 @@ def create_category(
 
     category = CategoryModel(name=name, description=data.description, image=data.image)
     db.add(category)
+    db.flush()  # gives the new category its id so we can log it
+    log_admin_action(db, admin, "create_category", "category", category.id, f"Created category {category.name}")
     db.commit()
     db.refresh(category)
     return category
@@ -66,6 +69,7 @@ def update_category(
     for field, value in updates.items():
         setattr(category, field, value)
 
+    log_admin_action(db, admin, "update_category", "category", category.id, f"Updated category {category.name}")
     db.commit()
     db.refresh(category)
     return category
@@ -78,6 +82,7 @@ def delete_category(
     admin: UserModel = Depends(require_admin),
 ):
     category = find_category(db, category_id)
+    log_admin_action(db, admin, "delete_category", "category", category.id, f"Deleted category {category.name}")
     # Businesses in this category keep existing; their category_id becomes null
     db.delete(category)
     db.commit()
