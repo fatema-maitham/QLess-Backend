@@ -110,6 +110,7 @@ Admins manage the overall platform, including users, businesses, categories, rev
 * Alembic
 * JWT Authentication
 * Pydantic
+* WebSockets
 
 ### Frontend
 
@@ -124,6 +125,49 @@ Admins manage the overall platform, including users, businesses, categories, rev
 * GitHub
 * Postman
 * Uvicorn
+* Pytest
+
+---
+## Frontend Repository
+
+[QLess Frontend Repository](https://github.com/fatema-maitham/QLess-Frontend)
+
+---
+
+## Getting Started
+
+1. Install packages
+```bash
+   pipenv install
+```
+2. Create a `.env` file
+```
+   DATABASE_URL=postgresql://localhost:5432/qless
+   JWT_SECRET=your_long_random_secret
+   CORS_ORIGINS=http://localhost:5173
+```
+3. Create the tables and add test data
+```bash
+   pipenv run alembic upgrade head
+   pipenv run python seed.py
+```
+4. Start the server, then open http://127.0.0.1:8000/docs
+```bash
+   pipenv run uvicorn main:app --reload
+```
+5. Run the tests
+```bash
+   pipenv run pytest -v
+```
+
+### Test accounts (password: `password123`)
+
+| Role | Email |
+| --- | --- |
+| Admin | admin@qless.com |
+| Owner | owner@qless.com |
+| Staff | staff@qless.com |
+| Customer | customer@qless.com |
 
 ---
 
@@ -254,8 +298,7 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 | Protocol  | URI                     | Role      | Use Case                                          |
 | --------- | ----------------------- | --------- | ------------------------------------------------- |
-| WebSocket | `/ws/queues/{queue_id}` | Logged in | Live queue position, called alerts, status changes |
-
+| WebSocket | `/ws/queues/{queue_id}?token=<JWT>` | Logged in | Live queue position, called alerts, status changes |
 ---
 
 ### Booking Routes
@@ -513,3 +556,16 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 * As an admin, I can view accounts flagged for suspicious activity.
 * As an admin, I can mark suspicious activity as reviewed or dismissed.
 * As an admin, I can review audit logs.
+
+---
+
+## Future Enhancements
+
+* SMS and WhatsApp notifications when a customer's turn is near
+* QR code check-in at the branch
+* Email verification and password reset
+* Arabic language support
+* Map view of nearby branches
+* Online payment for bookings
+* Charts for queue analytics
+* Mobile app
