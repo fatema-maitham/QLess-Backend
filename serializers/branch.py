@@ -21,6 +21,7 @@ class BranchUpdateSchema(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     image: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class BranchSchema(BaseModel):
