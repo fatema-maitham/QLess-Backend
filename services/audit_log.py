@@ -28,3 +28,19 @@ def log_admin_action(
             description=description,
         )
     )
+
+
+def paused_by_admin(db: Session, entity_type: str, entity_id: int) -> bool:
+    """True if the last admin action on this branch/business was a deactivate.
+    Used so an owner can't turn back on something an admin paused."""
+    last = (
+        db.query(AuditLogModel)
+        .filter(
+            AuditLogModel.entity_type == entity_type,
+            AuditLogModel.entity_id == entity_id,
+            AuditLogModel.action.in_([f"activate_{entity_type}", f"deactivate_{entity_type}"]),
+        )
+        .order_by(AuditLogModel.created_at.desc(), AuditLogModel.id.desc())
+        .first()
+    )
+    return last is not None and last.action == f"deactivate_{entity_type}"

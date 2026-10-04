@@ -33,6 +33,7 @@ class BusinessUpdateSchema(BaseModel):
     category_id: Optional[int] = None
     # Owners can only move a business to "pending". Approve/reject is the admin's job.
     approval_status: Optional[Literal["pending"]] = None
+    is_active: Optional[bool] = None
 
 
 class BusinessSchema(BaseModel):

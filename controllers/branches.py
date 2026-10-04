@@ -12,6 +12,7 @@ from models.business import BusinessModel
 from models.user import UserModel
 from serializers.branch import BranchCreateSchema, BranchSchema, BranchUpdateSchema
 from services.opening_hours import branch_is_open_now
+from services.audit_log import paused_by_admin
 
 router = APIRouter(tags=["Branches"])
 
@@ -106,7 +107,6 @@ def show_branch(
     branch.is_open_now = branch_is_open_now(branch)
     return branch
 
-
 @router.patch("/branches/{branch_id}", response_model=BranchSchema)
 def update_branch(
     branch_id: int,
@@ -115,8 +115,19 @@ def update_branch(
     current_user: UserModel = Depends(require_owner),
 ):
     branch = get_owned_branch(branch_id, db, current_user)
+    changes = data.model_dump(exclude_unset=True)
 
-    for field, value in data.model_dump(exclude_unset=True).items():
+    # Owner turns their branch on/off. They can't undo an admin's pause.
+    new_active = changes.pop("is_active", None)
+    if new_active is not None and new_active != branch.is_active:
+        if new_active and paused_by_admin(db, "branch", branch.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="An admin paused this branch. Contact QLess support to turn it back on.",
+            )
+        branch.is_active = new_active
+
+    for field, value in changes.items():
         if field == "name":
             if value is None:
                 continue  # name can't be empty
@@ -125,8 +136,8 @@ def update_branch(
 
     db.commit()
     db.refresh(branch)
+    branch.is_open_now = branch_is_open_now(branch)
     return branch
-
 
 @router.delete("/branches/{branch_id}")
 def delete_branch(
