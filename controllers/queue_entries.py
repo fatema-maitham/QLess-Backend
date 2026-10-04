@@ -1,5 +1,4 @@
 # controllers/queue_entries.py
-import math
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -77,7 +76,7 @@ def entry_out(db: Session, entry: QueueEntryModel) -> QueueEntrySchema:
             .count()
         )
         # With more than one counter, several people are served at the same time
-        rounds = math.ceil(ahead / max(queue.counter_count or 1, 1))
+        rounds = ahead // max(queue.counter_count or 1, 1)
         wait = rounds * queue.average_service_minutes
         data.people_ahead = ahead
         data.position = ahead + 1

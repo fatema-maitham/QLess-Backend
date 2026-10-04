@@ -178,6 +178,19 @@ def update_queue(
     if "name" in updates:
         updates["name"] = updates["name"].strip()
 
+
+    # Don't remove a counter that is still serving someone
+    if updates.get("counter_count") is not None:
+        highest_busy = (
+            db.query(func.max(QueueEntryModel.counter_number))
+            .filter(QueueEntryModel.queue_id == queue.id, QueueEntryModel.status.in_(["called", "checked_in"]))
+            .scalar()
+        )
+        if highest_busy and updates["counter_count"] < highest_busy:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Counter {highest_busy} is still serving someone. Finish that ticket before removing the counter",
+            )
     for field, value in updates.items():
         setattr(queue, field, value)
 
@@ -241,6 +254,23 @@ def call_next(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"This queue has {queue.counter_count} counter(s). Pick a counter from 1 to {queue.counter_count}",
+        )
+
+    # A counter serves one person at a time
+    still_serving = (
+        db.query(QueueEntryModel)
+        .filter(
+            QueueEntryModel.queue_id == queue.id,
+            QueueEntryModel.counter_number == counter,
+            QueueEntryModel.status.in_(["called", "checked_in"]),
+        )
+        .first()
+    )
+    if still_serving:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Counter {counter} is still serving number {still_serving.queue_number}. "
+            "Mark it completed or no-show first",
         )
 
     entry = (
