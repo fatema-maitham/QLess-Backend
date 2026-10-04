@@ -19,6 +19,7 @@ class QueueEntryModel(BaseModel):
     completed_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
     no_show_at = Column(DateTime, nullable=True)
+    counter_number = Column(Integer, nullable=True)  # which desk called this ticket
 
     queue = relationship("QueueModel", back_populates="entries")
     user = relationship("UserModel", back_populates="queue_entries")

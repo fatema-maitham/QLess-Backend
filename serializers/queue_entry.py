@@ -24,6 +24,7 @@ class QueueEntrySchema(BaseModel):
     completed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     no_show_at: Optional[datetime] = None
+    counter_number: Optional[int] = None  # the counter that called this ticket
 
     # Filled in by the controller
     customer_name: Optional[str] = None

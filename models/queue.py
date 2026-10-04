@@ -16,6 +16,7 @@ class QueueModel(BaseModel):
     max_capacity = Column(Integer, nullable=True)
     average_service_minutes = Column(Integer, default=10, nullable=False)
     no_show_grace_minutes = Column(Integer, default=5, nullable=False)
+    counter_count = Column(Integer, default=1, server_default="1", nullable=False)  # desks serving this queue
 
     business = relationship("BusinessModel", back_populates="queues")
     branch = relationship("BranchModel", back_populates="queues")
