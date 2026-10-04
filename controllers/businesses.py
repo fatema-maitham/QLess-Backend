@@ -10,6 +10,7 @@ from models.business import BusinessModel
 from models.category import CategoryModel
 from models.user import UserModel
 from serializers.business import BusinessCreateSchema, BusinessSchema, BusinessUpdateSchema
+from services.audit_log import paused_by_admin
 
 # No prefix here because this file also has /users/me/businesses.
 # The public list GET /businesses is in Fatema's controllers/browse.py.
@@ -113,6 +114,16 @@ def update_business(
             )
         business.approval_status = "pending"
         business.rejection_reason = None
+
+    # Owner turns their business on/off. They can't undo an admin's suspension.
+    new_active = changes.pop("is_active", None)
+    if new_active is not None and new_active != business.is_active:
+        if new_active and paused_by_admin(db, "business", business.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="An admin suspended this business. Contact QLess support to turn it back on.",
+            )
+        business.is_active = new_active
 
     for field, value in changes.items():
         if field == "name":
