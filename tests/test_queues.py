@@ -193,3 +193,62 @@ def test_restricted_customer_cannot_join(test_app: TestClient, test_db: Session,
 
     assert response.status_code == 403
     assert "can't join queues" in response.json()["detail"]
+
+    
+
+# ---------- Counters ----------
+
+def test_call_next_to_a_counter(test_app: TestClient, test_db: Session, override_get_db):
+    queue = find_queue(test_db, "Teller Queue")
+    owner = login(test_app, "owner@qless.com")
+    customer = sign_up(test_app, "counter@test.com")
+
+    updated = test_app.patch(f"/api/queues/{queue.id}", json={"counter_count": 2}, headers=owner)
+    assert updated.status_code == 200
+    assert updated.json()["counter_count"] == 2
+
+    joined = test_app.post(f"/api/queues/{queue.id}/entries", headers=customer)
+    assert joined.status_code == 201
+    entry_id = joined.json()["id"]
+    number = joined.json()["queue_number"]
+
+    too_high = test_app.post(f"/api/queues/{queue.id}/call-next", json={"counter_number": 3}, headers=owner)
+    assert too_high.status_code == 400
+
+    called = test_app.post(f"/api/queues/{queue.id}/call-next", json={"counter_number": 2}, headers=owner)
+    assert called.status_code == 200
+    assert called.json()["entry"]["counter_number"] == 2
+    assert called.json()["queue"]["now_serving"] == [
+        {"counter_number": 2, "queue_number": number, "status": "called"}
+    ]
+
+    ticket = test_app.get(f"/api/queue-entries/{entry_id}", headers=customer)
+    assert ticket.json()["counter_number"] == 2
+
+
+def test_wait_is_shorter_with_more_counters(test_app: TestClient, test_db: Session, override_get_db):
+    # Teller Queue now has 2 counters (test above) and 5 minutes per person
+    queue = find_queue(test_db, "Teller Queue")
+
+    for email in ["wait1@test.com", "wait2@test.com"]:
+        joined = test_app.post(f"/api/queues/{queue.id}/entries", headers=sign_up(test_app, email))
+        assert joined.status_code == 201
+
+    third = test_app.post(f"/api/queues/{queue.id}/entries", headers=sign_up(test_app, "wait3@test.com"))
+
+    assert third.json()["people_ahead"] == 2
+    assert third.json()["estimated_wait_minutes"] == 5  # 2 people, 2 counters -> one round of 5 min
+
+
+# ---------- Inactive places ----------
+
+def test_cannot_join_when_branch_is_inactive(test_app: TestClient, test_db: Session, override_get_db):
+    queue = find_queue(test_db, "Walk-in Queue")
+    customer = sign_up(test_app, "inactive@test.com")
+
+    queue.branch.is_active = False
+    test_db.commit()
+
+    response = test_app.post(f"/api/queues/{queue.id}/entries", headers=customer)
+
+    assert response.status_code == 400

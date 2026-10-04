@@ -1,4 +1,6 @@
 # controllers/queues.py
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -19,10 +21,12 @@ from models.user import UserModel
 from realtime.queue_updates import broadcast, queue_message
 from serializers.queue import (
     CallNextResponseSchema,
+    CallNextSchema,
     QueueAnalyticsSchema,
     QueueCreateSchema,
     QueueSchema,
     QueueUpdateSchema,
+    ServingSchema,
 )
 from services.notifications import notify, notify_turn_approaching
 
@@ -44,9 +48,28 @@ def count_waiting(db: Session, queue_id: int) -> int:
     )
 
 
+def serving_now(db: Session, queue_id: int) -> list[ServingSchema]:
+    """Tickets at a counter right now (called or checked in), by counter."""
+    entries = (
+        db.query(QueueEntryModel)
+        .filter(QueueEntryModel.queue_id == queue_id, QueueEntryModel.status.in_(["called", "checked_in"]))
+        .order_by(QueueEntryModel.counter_number, QueueEntryModel.queue_number)
+        .all()
+    )
+    return [
+        ServingSchema(
+            counter_number=entry.counter_number or 1,
+            queue_number=entry.queue_number,
+            status=entry.status,
+        )
+        for entry in entries
+    ]
+
+
 def queue_out(db: Session, queue: QueueModel) -> QueueSchema:
     data = QueueSchema.model_validate(queue)
     data.waiting_count = count_waiting(db, queue.id)
+    data.now_serving = serving_now(db, queue.id)
     return data
 
 
@@ -113,6 +136,7 @@ def create_queue(
         max_capacity=data.max_capacity,
         average_service_minutes=data.average_service_minutes,
         no_show_grace_minutes=data.no_show_grace_minutes,
+        counter_count=data.counter_count,
         status="closed",  # owner opens it when ready
     )
     db.add(queue)
@@ -201,6 +225,7 @@ def delete_queue(
 @router.post("/queues/{queue_id}/call-next", response_model=CallNextResponseSchema)
 def call_next(
     queue_id: int,
+    data: Optional[CallNextSchema] = None,
     db: Session = Depends(get_db),
     user: UserModel = Depends(require_owner_or_staff),
 ):
@@ -209,6 +234,14 @@ def call_next(
 
     if queue.status != "open":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Open the queue before calling the next person")
+
+    # Which counter is calling (counter 1 when the body is empty)
+    counter = data.counter_number if data else 1
+    if counter > queue.counter_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This queue has {queue.counter_count} counter(s). Pick a counter from 1 to {queue.counter_count}",
+        )
 
     entry = (
         db.query(QueueEntryModel)
@@ -221,13 +254,14 @@ def call_next(
 
     entry.status = "called"
     entry.called_at = func.now()
+    entry.counter_number = counter
     queue.current_number = entry.queue_number
 
     notify(
         entry.user,
         "called",
         "It's your turn!",
-        f"Ticket #{entry.queue_number} at {queue.name}: please come to the counter "
+        f"Ticket #{entry.queue_number} at {queue.name}: please come to counter {counter} "
         f"within {queue.no_show_grace_minutes} minutes.",
     )
 
@@ -244,11 +278,12 @@ def call_next(
         queue_message(
             db, queue, "entry_called",
             entry_id=entry.id, user_id=entry.user_id, queue_number=entry.queue_number,
+            counter_number=counter,
         ),
     )
 
     return {
-        "message": f"Called number {entry.queue_number}",
+        "message": f"Called number {entry.queue_number} to counter {counter}",
         "queue": queue_out(db, queue),
         "entry": entry,
     }

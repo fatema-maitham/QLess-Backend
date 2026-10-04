@@ -1,4 +1,5 @@
 # controllers/queue_entries.py
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -75,7 +76,9 @@ def entry_out(db: Session, entry: QueueEntryModel) -> QueueEntrySchema:
             )
             .count()
         )
-        wait = ahead * queue.average_service_minutes
+        # With more than one counter, several people are served at the same time
+        rounds = math.ceil(ahead / max(queue.counter_count or 1, 1))
+        wait = rounds * queue.average_service_minutes
         data.people_ahead = ahead
         data.position = ahead + 1
         data.estimated_wait_minutes = wait
@@ -102,6 +105,11 @@ def create_queue_entry(
 
     if queue.status != "open":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This queue is not open right now")
+
+    # The business must be approved and active, and the branch active
+    business = queue.business
+    if business.approval_status != "approved" or not business.is_active or not queue.branch.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This place isn't taking customers right now")
 
     # Compare in the database so the time zones always match
     restricted_until = (
