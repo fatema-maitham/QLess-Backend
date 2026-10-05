@@ -21,6 +21,7 @@ class UserModel(BaseModel):
     password_hash = Column(String, nullable=False)
     phone = Column(String)
     profile_image = Column(String)
+    cover_image = Column(String)
     no_show_count = Column(Integer, default=0, nullable=False)
     restricted_until = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
