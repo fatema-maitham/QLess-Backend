@@ -13,13 +13,13 @@ def sign_up(test_app, name, email, role="customer"):
 
 
 def create_business(test_app, headers, name="Test Cafe"):
-    response = test_app.post("/api/businesses", json={"name": name}, headers=headers)
+    response = test_app.post("/api/businesses", json={"name": name, "category_id": 1}, headers=headers)
     assert response.status_code == 201
     return response.json()
 
 
 def create_branch(test_app, headers, business_id, name="Main Branch"):
-    response = test_app.post(f"/api/businesses/{business_id}/branches", json={"name": name}, headers=headers)
+    response = test_app.post(f"/api/businesses/{business_id}/branches", json={"name": name, "category_id": 1}, headers=headers)
     assert response.status_code == 201
     return response.json()
 
@@ -38,7 +38,7 @@ def test_owner_creates_business_as_draft(test_app, override_get_db):
 
 def test_customer_cannot_create_business(test_app, override_get_db):
     customer = login(test_app, "customer@qless.com")
-    response = test_app.post("/api/businesses", json={"name": "Not Allowed"}, headers=customer)
+    response = test_app.post("/api/businesses", json={"name": "Not Allowed", "category_id": 1}, headers=customer)
     assert response.status_code == 403
 
 
