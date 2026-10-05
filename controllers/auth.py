@@ -63,32 +63,33 @@ def sign_in(data: SignInSchema, db: Session = Depends(get_db)):
     return {"token": user.generate_token(), "user": user}
 
 
-
 @router.post("/forgot-password")
 def forgot_password(data: ForgotPasswordSchema, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == data.email).first()
 
-  
-
-    response = {"message": "We sent a reset link to your email."}
-    link = None
-    if user and user.is_active:
-        link = f"{FRONTEND_URL}/reset-password?token={make_reset_token(user)}"
-        send_email(
-            to=user.email,
-            subject="Reset your QLess password",
-            body=(
-                f"Hi {user.name},\n\n"
-                "We got a request to reset the password for your QLess account.\n\n"
-                f"Click the link below to choose a new password:\n{link}\n\n"
-                f"This link works for {RESET_MINUTES} minutes and can only be used once.\n\n"
-                "If you didn't ask for this, you can ignore this email. Your password won't change.\n\n"
-                "— The QLess team"
-            ),
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="We couldn't find an account with this email.",
         )
 
+    link = f"{FRONTEND_URL}/reset-password?token={make_reset_token(user)}"
+    send_email(
+        to=user.email,
+        subject="Reset your QLess password",
+        body=(
+            f"Hi {user.name},\n\n"
+            "We got a request to reset the password for your QLess account.\n\n"
+            f"Click the link below to choose a new password:\n{link}\n\n"
+            f"This link works for {RESET_MINUTES} minutes and can only be used once.\n\n"
+            "If you didn't ask for this, you can ignore this email. Your password won't change.\n\n"
+            "— The QLess team"
+        ),
+    )
+
+    response = {"message": "We sent a reset link to your email."}
     # No email set up (fake accounts while developing): give the link to the page instead
-    if link and not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         response["reset_link"] = link
     return response
 
