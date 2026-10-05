@@ -68,6 +68,7 @@ def sign_in(data: SignInSchema, db: Session = Depends(get_db)):
 def forgot_password(data: ForgotPasswordSchema, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == data.email).first()
 
+    link = None
     if user and user.is_active:
         link = f"{FRONTEND_URL}/reset-password?token={make_reset_token(user)}"
         send_email(
@@ -83,8 +84,11 @@ def forgot_password(data: ForgotPasswordSchema, db: Session = Depends(get_db)):
             ),
         )
 
-    # Same answer either way, so nobody can find out which emails have accounts
-    return {"message": "If an account uses this email, we sent a reset link."}
+        response = {"message": "If an account uses this email, we sent a reset link."}
+    # No email set up (fake accounts while developing): give the link to the page instead
+    if link and not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        response["reset_link"] = link
+    return response
 
 
 @router.post("/reset-password")
