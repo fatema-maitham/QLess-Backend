@@ -19,7 +19,8 @@ class BusinessCreateSchema(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     image: Optional[str] = None
-    category_id: Optional[int] = None
+    category_id: int
+
 
 
 class BusinessUpdateSchema(BaseModel):
