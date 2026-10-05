@@ -4,7 +4,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from config.environment import FRONTEND_URL, JWT_SECRET
+from config.environment import FRONTEND_URL, JWT_SECRET, SMTP_HOST, SMTP_PASSWORD, SMTP_USER
 from database import get_db
 from models.role import RoleModel
 from models.user import UserModel
