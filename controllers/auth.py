@@ -68,6 +68,7 @@ def sign_in(data: SignInSchema, db: Session = Depends(get_db)):
 def forgot_password(data: ForgotPasswordSchema, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == data.email).first()
 
+    response = {"message": "If an account uses this email, we sent a reset link."}
     link = None
     if user and user.is_active:
         link = f"{FRONTEND_URL}/reset-password?token={make_reset_token(user)}"
