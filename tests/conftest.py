@@ -4,6 +4,8 @@ import pytest
 from starlette.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import sys
 import os
 
@@ -20,6 +22,16 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base.metadata.create_all(bind=engine)
+
+# A Monday at 10:00 in Bahrain: every seeded branch is open at this time
+MONDAY_10AM = datetime(2026, 10, 5, 10, 0, tzinfo=ZoneInfo("Asia/Bahrain"))
+
+@pytest.fixture(autouse=True)
+def branches_are_open(monkeypatch):
+    """Joining a queue needs the branch to be open right now.
+    Pretend it's Monday 10:00 so the tests pass at any time of day.
+    A test can change the time again with monkeypatch."""
+    monkeypatch.setattr("services.opening_hours.now_local", lambda: MONDAY_10AM)
 
 @pytest.fixture(scope="module")
 def test_app():
