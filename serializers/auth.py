@@ -32,6 +32,19 @@ class SignInSchema(BaseModel):
     def clean_email(cls, value: str) -> str:
         return value.strip().lower()
 
+class ForgotPasswordSchema(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class ResetPasswordSchema(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6)
+
 
 class AuthResponseSchema(BaseModel):
     token: str
