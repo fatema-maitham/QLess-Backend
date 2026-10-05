@@ -39,7 +39,7 @@ def test_app():
     yield client
 
 @pytest.fixture(scope="module")
-def test_db() -> Session:
+def test_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
