@@ -35,6 +35,7 @@ class UserUpdateSchema(BaseModel):
     email: Optional[str] = Field(default=None, min_length=3)
     phone: Optional[str] = None
     profile_image: Optional[str] = None
+    cover_image: Optional[str] = None
     # To change the password, send both of these
     current_password: Optional[str] = None
     new_password: Optional[str] = Field(default=None, min_length=6)
