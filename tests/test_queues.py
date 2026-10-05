@@ -50,6 +50,10 @@ def test_customer_joins_queue(test_app: TestClient, test_db: Session, override_g
     again = test_app.post(f"/api/queues/{queue.id}/entries", headers=headers)
     assert again.status_code == 400  # already in this queue
 
+    # Leave again, so this customer can join a queue at another place in the tests below
+    left = test_app.delete(f"/api/queue-entries/{response.json()['id']}", headers=headers)
+    assert left.status_code == 200
+
 
 def test_cannot_join_closed_queue(test_app: TestClient, test_db: Session, override_get_db):
     queue = find_queue(test_db, "Cards Queue")
