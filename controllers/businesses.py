@@ -102,6 +102,8 @@ def update_business(
     changes = data.model_dump(exclude_unset=True)
 
     if "category_id" in changes:
+        if changes["category_id"] is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category is required")
         check_category(changes["category_id"], db)
 
     # Submit / resubmit for admin approval

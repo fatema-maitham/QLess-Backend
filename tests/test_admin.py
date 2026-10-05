@@ -5,7 +5,7 @@ from tests.lib import login
 
 def submit_business(test_app, owner, name):
     """Create a business and submit it for approval. Returns its id."""
-    response = test_app.post("/api/businesses", json={"name": name}, headers=owner)
+    response = test_app.post("/api/businesses", json={"name": name, "category_id": 1}, headers=owner)
     assert response.status_code == 201
     business_id = response.json()["id"]
 
@@ -55,7 +55,7 @@ def test_reject_needs_reason_and_notifies_owner(test_app, override_get_db):
 def test_cannot_approve_a_draft(test_app, override_get_db):
     owner = login(test_app, "owner@qless.com")
     admin = login(test_app, "admin@qless.com")
-    response = test_app.post("/api/businesses", json={"name": "Still Draft Cafe"}, headers=owner)
+    response = test_app.post("/api/businesses", json={"name": name, "category_id": 1}, headers=owner)json={"name": "Still Draft Cafe", "category_id": 1}, headers=owner)
     business_id = response.json()["id"]
 
     response = test_app.patch(f"/api/admin/businesses/{business_id}", json={"approval_status": "approved"}, headers=admin)
@@ -119,7 +119,7 @@ def test_admin_cannot_deactivate_self(test_app, override_get_db):
 def test_admin_deactivates_branch(test_app, override_get_db):
     owner = login(test_app, "owner@qless.com")
     admin = login(test_app, "admin@qless.com")
-    business_id = test_app.post("/api/businesses", json={"name": "Branch Cafe"}, headers=owner).json()["id"]
+    business_id = test_app.post("/api/businesses", json={"name": "Branch Cafe", "category_id": 1}, headers=owner).json()["id"]
     branch_id = test_app.post(
         f"/api/businesses/{business_id}/branches", json={"name": "Admin Test Branch"}, headers=owner
     ).json()["id"]
