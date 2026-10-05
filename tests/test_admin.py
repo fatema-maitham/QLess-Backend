@@ -55,7 +55,7 @@ def test_reject_needs_reason_and_notifies_owner(test_app, override_get_db):
 def test_cannot_approve_a_draft(test_app, override_get_db):
     owner = login(test_app, "owner@qless.com")
     admin = login(test_app, "admin@qless.com")
-    response = test_app.post("/api/businesses", json={"name": name, "category_id": 1}, headers=owner)json={"name": "Still Draft Cafe", "category_id": 1}, headers=owner)
+    response = test_app.post("/api/businesses", json={"name": "Still Draft Cafe", "category_id": 1}, headers=owner)
     business_id = response.json()["id"]
 
     response = test_app.patch(f"/api/admin/businesses/{business_id}", json={"approval_status": "approved"}, headers=admin)
