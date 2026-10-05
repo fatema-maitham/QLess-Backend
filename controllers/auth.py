@@ -84,7 +84,6 @@ def forgot_password(data: ForgotPasswordSchema, db: Session = Depends(get_db)):
             ),
         )
 
-        response = {"message": "If an account uses this email, we sent a reset link."}
     # No email set up (fake accounts while developing): give the link to the page instead
     if link and not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         response["reset_link"] = link
