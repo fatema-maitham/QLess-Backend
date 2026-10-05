@@ -14,6 +14,7 @@ class UserSchema(BaseModel):
     email: str
     phone: Optional[str] = None
     profile_image: Optional[str] = None
+    cover_image: Optional[str] = None
     role: str
     no_show_count: int
     restricted_until: Optional[datetime] = None
