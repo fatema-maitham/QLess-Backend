@@ -11,6 +11,7 @@ from database import get_db
 from dependencies.get_current_user import get_current_user
 from dependencies.queue_access import check_owner_or_staff, find_queue, owns_business, works_at_branch
 from dependencies.roles import require_customer, require_owner_or_staff
+from models.queue import QueueModel
 from models.queue_entry import QueueEntryModel
 from models.user import UserModel
 from realtime.queue_updates import broadcast, queue_message
@@ -21,6 +22,7 @@ from serializers.queue_entry import (
     QueueEntryUpdateSchema,
 )
 from services.no_shows import handle_no_show
+from services.opening_hours import branch_is_open_now
 from services.suspicious_activity import check_frequent_cancellations
 
 router = APIRouter(tags=["Queue Entries"])
@@ -110,6 +112,14 @@ def create_queue_entry(
     if business.approval_status != "approved" or not business.is_active or not queue.branch.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This place isn't taking customers right now")
 
+    # The branch must be open right now (only checked when the owner has set opening hours)
+    branch = queue.branch
+    if branch.operating_hours and not branch_is_open_now(branch):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This branch is closed right now. Check the opening hours and come back later",
+        )
+
     # Compare in the database so the time zones always match
     restricted_until = (
         db.query(UserModel.restricted_until)
@@ -133,6 +143,26 @@ def create_queue_entry(
     )
     if already_in:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You're already in this queue")
+
+    # One place at a time. Two queues in the same branch are fine (e.g. two desks at a bank),
+    # but you can't wait at another branch or business at the same time.
+    elsewhere = (
+        db.query(QueueEntryModel)
+        .join(QueueModel, QueueEntryModel.queue_id == QueueModel.id)
+        .filter(
+            QueueEntryModel.user_id == user.id,
+            QueueEntryModel.status.in_(ACTIVE_STATUSES),
+            QueueModel.branch_id != queue.branch_id,
+        )
+        .first()
+    )
+    if elsewhere:
+        other = elsewhere.queue
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You're already in a queue at {other.business.name} ({other.branch.name}). "
+            "Leave that queue or finish your visit first",
+        )
 
     if queue.max_capacity is not None:
         in_line = (
