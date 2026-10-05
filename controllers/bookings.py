@@ -77,12 +77,20 @@ def check_bookable(service: ServiceModel):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This business is not taking bookings")
 
 
+def time_is_open(hours: OperatingHourModel, booking_time: time) -> bool:
+    """True if the time is inside the day's hours. Works for hours past midnight too (20:00-02:00)."""
+    if hours.open_time < hours.close_time:
+        return hours.open_time <= booking_time < hours.close_time
+    return booking_time >= hours.open_time or booking_time < hours.close_time
+
+
 def check_slot(
     db: Session,
     service: ServiceModel,
     booking_date: date,
     booking_time: time,
     exclude_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ):
     if datetime.combine(booking_date, booking_time) <= datetime.now():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pick a date and time in the future")
@@ -97,10 +105,26 @@ def check_slot(
     if hours:
         if hours.is_closed:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"The branch is closed on {day.title()}")
-        if hours.open_time and hours.close_time and not (hours.open_time <= booking_time < hours.close_time):
+        if hours.open_time and hours.close_time and not time_is_open(hours, booking_time):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"The branch is open {hours.open_time:%H:%M}–{hours.close_time:%H:%M} on {day.title()}",
+            )
+
+    # The customer can't have two bookings at the same time (at any place)
+    if user_id is not None:
+        mine = db.query(BookingModel).filter(
+            BookingModel.user_id == user_id,
+            BookingModel.booking_date == booking_date,
+            BookingModel.booking_time == booking_time,
+            BookingModel.status.in_(OPEN_STATUSES),
+        )
+        if exclude_id is not None:
+            mine = mine.filter(BookingModel.id != exclude_id)
+        if mine.first():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You already have another booking at that time. Pick another time",
             )
 
     taken = db.query(BookingModel).filter(
@@ -126,7 +150,7 @@ def create_booking(
 ):
     service = find_service(db, service_id)
     check_bookable(service)
-    check_slot(db, service, data.booking_date, data.booking_time)
+    check_slot(db, service, data.booking_date, data.booking_time, user_id=user.id)
 
     booking = BookingModel(
         user_id=user.id,
@@ -220,7 +244,7 @@ def customer_reschedule(db: Session, booking: BookingModel, updates: dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That's the same date and time")
 
     check_bookable(booking.service)
-    check_slot(db, booking.service, new_date, new_time, exclude_id=booking.id)
+    check_slot(db, booking.service, new_date, new_time, exclude_id=booking.id, user_id=booking.user_id)
 
     booking.booking_date = new_date
     booking.booking_time = new_time
