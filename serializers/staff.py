@@ -9,7 +9,7 @@ class StaffCreateSchema(BaseModel):
     user_email: str = Field(min_length=3)  # the person must already have an account
     position: Optional[str] = None  # e.g. "Cashier", "Receptionist"
     counter_number: int = Field(default=1, ge=1, le=20)
-
+    queue_id: Optional[int] = Field(default=None, gt=0)
     @field_validator("user_email")
     @classmethod
     def clean_email(cls, value: str) -> str:
@@ -49,7 +49,7 @@ class StaffSchema(BaseModel):
     is_active: bool
     created_at: Optional[datetime] = None
     user: StaffUserSchema
-
+    
 
 # ----- for GET /staff/me (the staff member's own home page) -----
 
