@@ -120,6 +120,12 @@ def get_staff(
     current_user: UserModel = Depends(require_owner),
 ):
     branch = get_owned_branch(branch_id, db, current_user)
+    validate_staff_assignment(
+    db,
+    branch.id,
+    data.queue_id,
+    data.counter_number,
+)
     return (
         db.query(StaffModel)
         .filter(StaffModel.branch_id == branch.id)
