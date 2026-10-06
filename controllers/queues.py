@@ -43,7 +43,10 @@ ALLOWED_MOVES = {
 def count_waiting(db: Session, queue_id: int) -> int:
     return (
         db.query(QueueEntryModel)
-        .filter(QueueEntryModel.queue_id == queue_id, QueueEntryModel.status == "waiting")
+        .filter(
+            QueueEntryModel.queue_id == queue_id,
+            QueueEntryModel.status == "waiting",
+        )
         .count()
     )
 
@@ -52,10 +55,17 @@ def serving_now(db: Session, queue_id: int) -> list[ServingSchema]:
     """Tickets at a counter right now (called or checked in), by counter."""
     entries = (
         db.query(QueueEntryModel)
-        .filter(QueueEntryModel.queue_id == queue_id, QueueEntryModel.status.in_(["called", "checked_in"]))
-        .order_by(QueueEntryModel.counter_number, QueueEntryModel.queue_number)
+        .filter(
+            QueueEntryModel.queue_id == queue_id,
+            QueueEntryModel.status.in_(["called", "checked_in"]),
+        )
+        .order_by(
+            QueueEntryModel.counter_number,
+            QueueEntryModel.queue_number,
+        )
         .all()
     )
+
     return [
         ServingSchema(
             counter_number=entry.counter_number or 1,
@@ -73,19 +83,33 @@ def queue_out(db: Session, queue: QueueModel) -> QueueSchema:
     return data
 
 
-def check_service_in_branch(db: Session, service_id: int, branch_id: int):
+def check_service_in_branch(
+    db: Session,
+    service_id: int,
+    branch_id: int,
+):
     service = (
         db.query(ServiceModel)
-        .filter(ServiceModel.id == service_id, ServiceModel.branch_id == branch_id)
+        .filter(
+            ServiceModel.id == service_id,
+            ServiceModel.branch_id == branch_id,
+        )
         .first()
     )
+
     if not service:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That service is not in this branch")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That service is not in this branch",
+        )
 
 
 def change_status(queue: QueueModel, new_status: str):
     if new_status == queue.status:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Queue is already {new_status}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Queue is already {new_status}",
+        )
 
     if new_status not in ALLOWED_MOVES[queue.status]:
         raise HTTPException(
@@ -95,27 +119,56 @@ def change_status(queue: QueueModel, new_status: str):
 
     if new_status == "open":
         business = queue.business
-        if business.approval_status != "approved" or not business.is_active:
+
+        if (
+            business.approval_status != "approved"
+            or not business.is_active
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The business must be approved and active before opening a queue",
+                detail=(
+                    "The business must be approved and active "
+                    "before opening a queue"
+                ),
             )
+
         if not queue.branch.is_active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This branch is deactivated")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This branch is deactivated",
+            )
 
     queue.status = new_status
 
 
 # ---------- List and create queues for a branch ----------
 
-@router.get("/branches/{branch_id}/queues", response_model=list[QueueSchema])
-def get_queues(branch_id: int, db: Session = Depends(get_db)):
+
+@router.get(
+    "/branches/{branch_id}/queues",
+    response_model=list[QueueSchema],
+)
+def get_queues(
+    branch_id: int,
+    db: Session = Depends(get_db),
+):
     find_branch(db, branch_id)
-    queues = db.query(QueueModel).filter(QueueModel.branch_id == branch_id).order_by(QueueModel.name).all()
+
+    queues = (
+        db.query(QueueModel)
+        .filter(QueueModel.branch_id == branch_id)
+        .order_by(QueueModel.name)
+        .all()
+    )
+
     return [queue_out(db, queue) for queue in queues]
 
 
-@router.post("/branches/{branch_id}/queues", response_model=QueueSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/branches/{branch_id}/queues",
+    response_model=QueueSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_queue(
     branch_id: int,
     data: QueueCreateSchema,
@@ -126,7 +179,11 @@ def create_queue(
     check_owner(user, branch.business)
 
     if data.service_id is not None:
-        check_service_in_branch(db, data.service_id, branch.id)
+        check_service_in_branch(
+            db,
+            data.service_id,
+            branch.id,
+        )
 
     queue = QueueModel(
         business_id=branch.business_id,
@@ -137,22 +194,37 @@ def create_queue(
         average_service_minutes=data.average_service_minutes,
         no_show_grace_minutes=data.no_show_grace_minutes,
         counter_count=data.counter_count,
-        status="closed",  # owner opens it when ready
+        status="closed",
     )
+
     db.add(queue)
     db.commit()
     db.refresh(queue)
+
     return queue_out(db, queue)
 
 
 # ---------- One queue ----------
 
-@router.get("/queues/{queue_id}", response_model=QueueSchema)
-def show_queue(queue_id: int, db: Session = Depends(get_db)):
-    return queue_out(db, find_queue(db, queue_id))
+
+@router.get(
+    "/queues/{queue_id}",
+    response_model=QueueSchema,
+)
+def show_queue(
+    queue_id: int,
+    db: Session = Depends(get_db),
+):
+    return queue_out(
+        db,
+        find_queue(db, queue_id),
+    )
 
 
-@router.patch("/queues/{queue_id}", response_model=QueueSchema)
+@router.patch(
+    "/queues/{queue_id}",
+    response_model=QueueSchema,
+)
 def update_queue(
     queue_id: int,
     data: QueueUpdateSchema,
@@ -163,30 +235,83 @@ def update_queue(
     check_owner(user, queue.business)
 
     updates = data.model_dump(exclude_unset=True)
+
     if not updates:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nothing to update")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nothing to update",
+        )
 
     new_status = updates.pop("status", None)
 
-    if "service_id" in updates and updates["service_id"] is not None:
-        check_service_in_branch(db, updates["service_id"], queue.branch_id)
+    # -------------------------------------------------
+    # FIX #11
+    # Do not allow the service to change once this
+    # queue already has queue-entry history.
+    # -------------------------------------------------
+    if "service_id" in updates:
+        new_service_id = updates["service_id"]
+
+        # Only apply the restriction when service_id
+        # is actually being changed.
+        if new_service_id != queue.service_id:
+            has_history = (
+                db.query(QueueEntryModel)
+                .filter(
+                    QueueEntryModel.queue_id == queue.id
+                )
+                .first()
+            )
+
+            if has_history:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "This queue already has history. "
+                        "Its service cannot be changed."
+                    ),
+                )
+
+            if new_service_id is not None:
+                check_service_in_branch(
+                    db,
+                    new_service_id,
+                    queue.branch_id,
+                )
 
     if "name" in updates:
         updates["name"] = updates["name"].strip()
 
-
     # Don't remove a counter that is still serving someone
     if updates.get("counter_count") is not None:
         highest_busy = (
-            db.query(func.max(QueueEntryModel.counter_number))
-            .filter(QueueEntryModel.queue_id == queue.id, QueueEntryModel.status.in_(["called", "checked_in"]))
+            db.query(
+                func.max(
+                    QueueEntryModel.counter_number
+                )
+            )
+            .filter(
+                QueueEntryModel.queue_id == queue.id,
+                QueueEntryModel.status.in_(
+                    ["called", "checked_in"]
+                ),
+            )
             .scalar()
         )
-        if highest_busy and updates["counter_count"] < highest_busy:
+
+        if (
+            highest_busy
+            and updates["counter_count"] < highest_busy
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Counter {highest_busy} is still serving someone. Finish that ticket before removing the counter",
+                detail=(
+                    f"Counter {highest_busy} is still "
+                    "serving someone. Finish that ticket "
+                    "before removing the counter"
+                ),
             )
+
     for field, value in updates.items():
         setattr(queue, field, value)
 
@@ -196,8 +321,20 @@ def update_queue(
     db.commit()
     db.refresh(queue)
 
-    event = "queue_status_changed" if new_status is not None else "queue_updated"
-    broadcast(queue.id, queue_message(db, queue, event))
+    event = (
+        "queue_status_changed"
+        if new_status is not None
+        else "queue_updated"
+    )
+
+    broadcast(
+        queue.id,
+        queue_message(
+            db,
+            queue,
+            event,
+        ),
+    )
 
     return queue_out(db, queue)
 
@@ -211,27 +348,57 @@ def delete_queue(
     queue = find_queue(db, queue_id)
     check_owner(user, queue.business)
 
+    # -------------------------------------------------
+    # FIX #6
+    # A checked-in ticket is still active.
+    # Queue deletion must be blocked for:
+    # waiting, called and checked_in.
+    # -------------------------------------------------
     active = (
         db.query(QueueEntryModel)
-        .filter(QueueEntryModel.queue_id == queue.id, QueueEntryModel.status.in_(["waiting", "called"]))
+        .filter(
+            QueueEntryModel.queue_id == queue.id,
+            QueueEntryModel.status.in_(
+                ["waiting", "called", "checked_in"]
+            ),
+        )
         .count()
     )
+
     if active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="People are still waiting in this queue. Close it and serve them first",
+            detail=(
+                "This queue still has active tickets. "
+                "Finish or remove all waiting, called, "
+                "and checked-in tickets before deleting it."
+            ),
         )
 
-    queue_id = queue.id
+    deleted_queue_id = queue.id
+
+    # Permanent delete — as requested.
     db.delete(queue)
     db.commit()
-    broadcast(queue_id, {"type": "queue_deleted", "queue_id": queue_id})
+
+    broadcast(
+        deleted_queue_id,
+        {
+            "type": "queue_deleted",
+            "queue_id": deleted_queue_id,
+        },
+    )
+
     return {"message": "Queue deleted"}
 
 
 # ---------- Call next ----------
 
-@router.post("/queues/{queue_id}/call-next", response_model=CallNextResponseSchema)
+
+@router.post(
+    "/queues/{queue_id}/call-next",
+    response_model=CallNextResponseSchema,
+)
 def call_next(
     queue_id: int,
     data: Optional[CallNextSchema] = None,
@@ -242,9 +409,16 @@ def call_next(
     check_owner_or_staff(db, user, queue)
 
     if queue.status != "open":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Open the queue before calling the next person")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Open the queue before calling "
+                "the next person"
+            ),
+        )
 
-    # Staff always serve from the counter assigned by the owner.
+    # Staff always serve from the counter
+    # assigned by the owner.
     from models.staff import StaffModel
 
     assignment = (
@@ -256,15 +430,23 @@ def call_next(
         )
         .first()
     )
+
     if not assignment:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not assigned to this branch")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this branch",
+        )
 
     counter = assignment.counter_number
 
     if counter > queue.counter_count:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"This queue has {queue.counter_count} counter(s). Pick a counter from 1 to {queue.counter_count}",
+            detail=(
+                f"This queue has {queue.counter_count} "
+                "counter(s). Pick a counter from 1 to "
+                f"{queue.counter_count}"
+            ),
         )
 
     # A counter serves one person at a time
@@ -273,25 +455,38 @@ def call_next(
         .filter(
             QueueEntryModel.queue_id == queue.id,
             QueueEntryModel.counter_number == counter,
-            QueueEntryModel.status.in_(["called", "checked_in"]),
+            QueueEntryModel.status.in_(
+                ["called", "checked_in"]
+            ),
         )
         .first()
     )
+
     if still_serving:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Counter {counter} is still serving number {still_serving.queue_number}. "
-            "Mark it completed or no-show first",
+            detail=(
+                f"Counter {counter} is still serving "
+                f"number {still_serving.queue_number}. "
+                "Mark it completed or no-show first"
+            ),
         )
 
     entry = (
         db.query(QueueEntryModel)
-        .filter(QueueEntryModel.queue_id == queue.id, QueueEntryModel.status == "waiting")
+        .filter(
+            QueueEntryModel.queue_id == queue.id,
+            QueueEntryModel.status == "waiting",
+        )
         .order_by(QueueEntryModel.queue_number)
         .first()
     )
+
     if not entry:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No one is waiting")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No one is waiting",
+        )
 
     entry.status = "called"
     entry.called_at = func.now()
@@ -302,13 +497,22 @@ def call_next(
         entry.user,
         "called",
         "It's your turn!",
-        f"Ticket #{entry.queue_number} at {queue.name}: please come to counter {counter} "
-        f"within {queue.no_show_grace_minutes} minutes.",
+        (
+            f"Ticket #{entry.queue_number} at "
+            f"{queue.name}: please come to counter "
+            f"{counter} within "
+            f"{queue.no_show_grace_minutes} minutes."
+        ),
     )
 
-    # Save the "called" change first so the next waiting people are counted correctly
+    # Save the "called" change first so the next
+    # waiting people are counted correctly.
     db.flush()
-    notify_turn_approaching(db, queue)
+
+    notify_turn_approaching(
+        db,
+        queue,
+    )
 
     db.commit()
     db.refresh(entry)
@@ -317,14 +521,21 @@ def call_next(
     broadcast(
         queue.id,
         queue_message(
-            db, queue, "entry_called",
-            entry_id=entry.id, user_id=entry.user_id, queue_number=entry.queue_number,
+            db,
+            queue,
+            "entry_called",
+            entry_id=entry.id,
+            user_id=entry.user_id,
+            queue_number=entry.queue_number,
             counter_number=counter,
         ),
     )
 
     return {
-        "message": f"Called number {entry.queue_number} to counter {counter}",
+        "message": (
+            f"Called number {entry.queue_number} "
+            f"to counter {counter}"
+        ),
         "queue": queue_out(db, queue),
         "entry": entry,
     }
@@ -332,12 +543,25 @@ def call_next(
 
 # ---------- Analytics ----------
 
+
 def average_minutes(pairs):
-    minutes = [(end - start).total_seconds() / 60 for start, end in pairs if start and end]
-    return round(sum(minutes) / len(minutes), 1) if minutes else None
+    minutes = [
+        (end - start).total_seconds() / 60
+        for start, end in pairs
+        if start and end
+    ]
+
+    return (
+        round(sum(minutes) / len(minutes), 1)
+        if minutes
+        else None
+    )
 
 
-@router.get("/queues/{queue_id}/analytics", response_model=QueueAnalyticsSchema)
+@router.get(
+    "/queues/{queue_id}/analytics",
+    response_model=QueueAnalyticsSchema,
+)
 def get_queue_analytics(
     queue_id: int,
     db: Session = Depends(get_db),
@@ -347,21 +571,52 @@ def get_queue_analytics(
     check_owner(user, queue.business)
 
     entries = queue.entries
-    counts = {name: 0 for name in ["waiting", "called", "checked_in", "completed", "cancelled", "no_show"]}
+
+    counts = {
+        name: 0
+        for name in [
+            "waiting",
+            "called",
+            "checked_in",
+            "completed",
+            "cancelled",
+            "no_show",
+        ]
+    }
+
     for entry in entries:
         if entry.status in counts:
             counts[entry.status] += 1
 
-    finished = counts["completed"] + counts["no_show"]
-    no_show_rate = round(counts["no_show"] / finished * 100, 1) if finished else 0.0
+    finished = (
+        counts["completed"]
+        + counts["no_show"]
+    )
+
+    no_show_rate = (
+        round(
+            counts["no_show"] / finished * 100,
+            1,
+        )
+        if finished
+        else 0.0
+    )
 
     return {
         "queue_id": queue.id,
         "total_entries": len(entries),
         **counts,
         "no_show_rate": no_show_rate,
-        "average_wait_minutes": average_minutes((e.joined_at, e.called_at) for e in entries),
+        "average_wait_minutes": average_minutes(
+            (entry.joined_at, entry.called_at)
+            for entry in entries
+        ),
         "average_service_minutes": average_minutes(
-            (e.checked_in_at, e.completed_at) for e in entries if e.status == "completed"
+            (
+                entry.checked_in_at,
+                entry.completed_at,
+            )
+            for entry in entries
+            if entry.status == "completed"
         ),
     }
