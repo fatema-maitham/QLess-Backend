@@ -248,8 +248,26 @@ def call_next(
     if queue.status != "open":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Open the queue before calling the next person")
 
-    # Which counter is calling (counter 1 when the body is empty)
-    counter = data.counter_number if data else 1
+    # Owners may operate any counter. Staff always use the counter assigned
+    # to them by the owner; their job title (e.g. Teller) is separate.
+    if user.role.name == "staff":
+        from models.staff import StaffModel
+
+        assignment = (
+            db.query(StaffModel)
+            .filter(
+                StaffModel.user_id == user.id,
+                StaffModel.branch_id == queue.branch_id,
+                StaffModel.is_active.is_(True),
+            )
+            .first()
+        )
+        if not assignment:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not assigned to this branch")
+        counter = assignment.counter_number
+    else:
+        counter = data.counter_number if data else 1
+
     if counter > queue.counter_count:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

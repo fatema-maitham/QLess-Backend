@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class StaffCreateSchema(BaseModel):
     user_email: str = Field(min_length=3)  # the person must already have an account
     position: Optional[str] = None  # e.g. "Cashier", "Receptionist"
+    counter_number: int = Field(default=1, ge=1, le=20)
 
     @field_validator("user_email")
     @classmethod
@@ -19,6 +20,7 @@ class StaffUpdateSchema(BaseModel):
     """All optional. Only send what you want to change."""
 
     position: Optional[str] = None
+    counter_number: Optional[int] = Field(default=None, ge=1, le=20)
     is_active: Optional[bool] = None
 
 
@@ -43,6 +45,7 @@ class StaffSchema(BaseModel):
     business_id: int
     branch_id: int
     position: Optional[str] = None
+    counter_number: int
     is_active: bool
     created_at: Optional[datetime] = None
     user: StaffUserSchema
@@ -77,6 +80,7 @@ class StaffQueueSchema(BaseModel):
 class StaffMeSchema(BaseModel):
     id: int
     position: Optional[str] = None
+    counter_number: int
     business: StaffBusinessSchema
     branch: StaffBranchSchema
     queues: List[StaffQueueSchema]

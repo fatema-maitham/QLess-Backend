@@ -81,6 +81,7 @@ def get_me_staff(
     return StaffMeSchema(
         id=staff.id,
         position=staff.position,
+        counter_number=staff.counter_number,
         business=StaffBusinessSchema.model_validate(staff.business),
         branch=StaffBranchSchema.model_validate(staff.branch),
         queues=[StaffQueueSchema.model_validate(queue) for queue in staff.branch.queues],
@@ -143,6 +144,7 @@ def create_staff(
         business_id=branch.business_id,
         branch_id=branch.id,
         position=data.position,
+        counter_number=data.counter_number,
     )
     set_role(db, user, "staff")
 
@@ -173,6 +175,9 @@ def update_staff(
 
     if "position" in changes:
         staff.position = changes["position"]
+
+    if "counter_number" in changes:
+        staff.counter_number = changes["counter_number"]
 
     new_active = changes.get("is_active")
     if new_active is True and not staff.is_active:
