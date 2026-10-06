@@ -26,3 +26,4 @@ class StaffModel(BaseModel):
     user = relationship("UserModel", back_populates="staff_assignments")
     business = relationship("BusinessModel", back_populates="staff")
     branch = relationship("BranchModel", back_populates="staff")
+    queue = relationship("QueueModel")
