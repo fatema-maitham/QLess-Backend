@@ -1,4 +1,3 @@
-# models/staff.py
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from .base import BaseModel
@@ -7,11 +6,21 @@ from .base import BaseModel
 class StaffModel(BaseModel):
     __tablename__ = "staff"
 
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
-    branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
-    branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
-
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    business_id = Column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    branch_id = Column(
+        Integer,
+        ForeignKey("branches.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     queue_id = Column(
         Integer,
         ForeignKey("queues.id", ondelete="SET NULL"),
@@ -19,8 +28,12 @@ class StaffModel(BaseModel):
     )
 
     position = Column(String)
-    position = Column(String)
-    counter_number = Column(Integer, default=1, server_default="1", nullable=False)
+    counter_number = Column(
+        Integer,
+        default=1,
+        server_default="1",
+        nullable=False,
+    )
     is_active = Column(Boolean, default=True, nullable=False)
 
     user = relationship("UserModel", back_populates="staff_assignments")
