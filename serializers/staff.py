@@ -58,6 +58,7 @@ class StaffBusinessSchema(BaseModel):
 
     id: int
     name: str
+    image: Optional[str] = None
 
 
 class StaffBranchSchema(BaseModel):
