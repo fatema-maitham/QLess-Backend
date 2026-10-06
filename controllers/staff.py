@@ -61,7 +61,31 @@ def deactivate_staff(db: Session, staff: StaffModel):
     if not has_other_active_assignment(db, staff.user_id, staff.id):
         set_role(db, staff.user, "customer")
 
+def validate_staff_assignment(
+    db: Session,
+    branch_id: int,
+    queue_id: int | None,
+    counter_number: int,
+):
+    if queue_id is None:
+        return
 
+    queue = db.query(QueueModel).filter(
+        QueueModel.id == queue_id,
+        QueueModel.branch_id == branch_id,
+    ).first()
+
+    if not queue:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose a queue belonging to this branch",
+        )
+
+    if counter_number > queue.counter_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Choose a counter from 1 to {queue.counter_count}",
+        )
 # ---------- routes ----------
 # /staff/me must come BEFORE /staff/{staff_id}, otherwise "me" is read as an id
 
