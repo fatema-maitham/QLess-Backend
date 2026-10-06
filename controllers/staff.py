@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from controllers.branches import get_owned_branch
 from database import get_db
 from dependencies.roles import require_owner, require_staff
 from models.queue_entry import QueueEntryModel
+from models.queue import QueueModel
 from models.role import RoleModel
 from models.staff import StaffModel
 from models.user import UserModel
@@ -19,6 +20,7 @@ from serializers.staff import (
     StaffSchema,
     StaffUpdateSchema,
 )
+
 
 router = APIRouter(tags=["Staff"])
 
@@ -101,10 +103,6 @@ def get_active_ticket_for_staff(
     """
     Find a called/checked-in ticket currently being
     served at this staff member's assigned counter.
-
-    Staff is currently assigned by branch + counter.
-    When queue-specific assignment is added later,
-    this can also check queue_id.
     """
 
     if not staff.is_active:
@@ -114,8 +112,7 @@ def get_active_ticket_for_staff(
         db.query(QueueEntryModel)
         .filter(
             QueueEntryModel.branch_id == staff.branch_id,
-            QueueEntryModel.counter_number
-            == staff.counter_number,
+            QueueEntryModel.counter_number == staff.counter_number,
             QueueEntryModel.status.in_(
                 ["called", "checked_in"]
             ),
@@ -129,8 +126,7 @@ def ensure_not_serving(
     staff: StaffModel,
 ):
     """
-    FIX #8:
-    Do not allow counter changes or deactivation
+    Do not allow assignment changes or deactivation
     while the staff member is serving someone.
     """
 
@@ -147,7 +143,7 @@ def ensure_not_serving(
                 f"ticket #{active_ticket.queue_number} at "
                 f"counter {staff.counter_number}. "
                 "Complete or finish the ticket before "
-                "changing the counter or deactivating staff."
+                "changing the assignment or deactivating staff."
             ),
         )
 
@@ -169,6 +165,37 @@ def deactivate_staff(
             db,
             staff.user,
             "customer",
+        )
+
+
+def validate_staff_assignment(
+    db: Session,
+    branch_id: int,
+    queue_id: Optional[int],
+    counter_number: int,
+):
+    if queue_id is None:
+        return
+
+    queue = (
+        db.query(QueueModel)
+        .filter(
+            QueueModel.id == queue_id,
+            QueueModel.branch_id == branch_id,
+        )
+        .first()
+    )
+
+    if not queue:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose a queue belonging to this branch",
+        )
+
+    if not 1 <= counter_number <= queue.counter_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Choose a counter from 1 to {queue.counter_count}",
         )
 
 
@@ -202,13 +229,12 @@ def get_me_staff(
     if not staff:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "You are not assigned to a branch yet"
-            ),
+            detail="You are not assigned to a branch yet",
         )
 
     return StaffMeSchema(
         id=staff.id,
+        queue_id=staff.queue_id,
         position=staff.position,
         counter_number=staff.counter_number,
         business=StaffBusinessSchema.model_validate(
@@ -268,6 +294,13 @@ def create_staff(
         current_user,
     )
 
+    validate_staff_assignment(
+        db,
+        branch.id,
+        data.queue_id,
+        data.counter_number,
+    )
+
     user = (
         db.query(UserModel)
         .filter(
@@ -321,15 +354,14 @@ def create_staff(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"This person is already staff at {where}"
-            ),
+            detail=f"This person is already staff at {where}",
         )
 
     staff = StaffModel(
         user_id=user.id,
         business_id=branch.business_id,
         branch_id=branch.id,
+        queue_id=data.queue_id,
         position=data.position,
         counter_number=data.counter_number,
     )
@@ -383,29 +415,26 @@ def update_staff(
         exclude_unset=True
     )
 
-    # -------------------------------------------------
-    # FIX #8
-    #
-    # If the owner is trying to CHANGE the staff
-    # member's counter while they are currently
-    # serving someone, block the change.
-    # -------------------------------------------------
-    if (
-        "counter_number" in changes
-        and changes["counter_number"]
-        != staff.counter_number
-    ):
+    # Block assignment changes while the staff member
+    # is actively serving a customer.
+    assignment_changed = (
+        (
+            "counter_number" in changes
+            and changes["counter_number"] != staff.counter_number
+        )
+        or (
+            "queue_id" in changes
+            and changes["queue_id"] != staff.queue_id
+        )
+    )
+
+    if assignment_changed:
         ensure_not_serving(
             db,
             staff,
         )
 
-    # -------------------------------------------------
-    # FIX #8
-    #
-    # If the owner is trying to deactivate the staff
-    # member while they are serving someone, block it.
-    # -------------------------------------------------
+    # Deactivation is also blocked while serving.
     if (
         changes.get("is_active") is False
         and staff.is_active
@@ -415,13 +444,40 @@ def update_staff(
             staff,
         )
 
+    if (
+        "counter_number" in changes
+        and changes["counter_number"] is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Counter cannot be empty",
+        )
+
+    next_queue_id = changes.get(
+        "queue_id",
+        staff.queue_id,
+    )
+
+    next_counter = changes.get(
+        "counter_number",
+        staff.counter_number,
+    )
+
+    validate_staff_assignment(
+        db,
+        staff.branch_id,
+        next_queue_id,
+        next_counter,
+    )
+
+    if "queue_id" in changes:
+        staff.queue_id = next_queue_id
+
     if "position" in changes:
         staff.position = changes["position"]
 
     if "counter_number" in changes:
-        staff.counter_number = (
-            changes["counter_number"]
-        )
+        staff.counter_number = changes["counter_number"]
 
     new_active = changes.get("is_active")
 
@@ -429,9 +485,8 @@ def update_staff(
         new_active is True
         and not staff.is_active
     ):
-        # Reactivating:
-        # they can't be active somewhere else
-        # at the same time.
+        # Reactivating: they cannot already be active
+        # at another branch.
         if has_other_active_assignment(
             db,
             staff.user_id,
@@ -488,7 +543,8 @@ def delete_staff(
 ):
     """
     Deactivate (not a real delete).
-    The person goes back to being a customer.
+    The person goes back to being a customer
+    if they have no other active staff assignment.
     """
 
     staff = get_owned_staff(
@@ -498,7 +554,6 @@ def delete_staff(
     )
 
     if staff.is_active:
-        # FIX #8:
         # DELETE is another way to deactivate staff,
         # so it must use the same serving protection.
         ensure_not_serving(
