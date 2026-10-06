@@ -16,13 +16,25 @@ router = APIRouter(tags=["Real-time"])
 def user_from_token(db, token: Optional[str]):
     if not token:
         return None
+
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-    except jwt.PyJWTError:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=["HS256"],
+        )
+        user_id = int(payload.get("sub"))
+    except (jwt.PyJWTError, TypeError, ValueError):
         return None
-    return db.query(UserModel).filter(UserModel.id == payload.get("sub"), UserModel.is_active.is_(True)).first()
 
-
+    return (
+        db.query(UserModel)
+        .filter(
+            UserModel.id == user_id,
+            UserModel.is_active.is_(True),
+        )
+        .first()
+    )
 @router.websocket("/ws/queues/{queue_id}")
 async def queue_socket(websocket: WebSocket, queue_id: int, token: Optional[str] = None):
     with SessionLocal() as db:
