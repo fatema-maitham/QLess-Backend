@@ -95,27 +95,24 @@ def has_other_active_assignment(
         is not None
     )
 
-
 def get_active_ticket_for_staff(
     db: Session,
     staff: StaffModel,
 ):
     """
     Find a called/checked-in ticket currently being
-    served at this staff member's assigned counter.
+    served at this staff member's assigned queue and counter.
     """
 
-    if not staff.is_active:
+    if not staff.is_active or staff.queue_id is None:
         return None
 
     return (
         db.query(QueueEntryModel)
         .filter(
-            QueueEntryModel.branch_id == staff.branch_id,
+            QueueEntryModel.queue_id == staff.queue_id,
             QueueEntryModel.counter_number == staff.counter_number,
-            QueueEntryModel.status.in_(
-                ["called", "checked_in"]
-            ),
+            QueueEntryModel.status.in_(["called", "checked_in"]),
         )
         .first()
     )
