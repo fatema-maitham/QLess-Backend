@@ -11,6 +11,7 @@ class StaffModel(BaseModel):
     business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
     position = Column(String)
+    counter_number = Column(Integer, default=1, server_default="1", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     user = relationship("UserModel", back_populates="staff_assignments")

@@ -13,7 +13,7 @@ from dependencies.queue_access import (
     find_queue,
     owns_business,
 )
-from dependencies.roles import require_owner, require_owner_or_staff
+from dependencies.roles import require_owner, require_owner_or_staff, require_staff
 from models.queue import QueueModel
 from models.queue_entry import QueueEntryModel
 from models.service import ServiceModel
@@ -157,18 +157,14 @@ def update_queue(
     queue_id: int,
     data: QueueUpdateSchema,
     db: Session = Depends(get_db),
-    user: UserModel = Depends(require_owner_or_staff),
+    user: UserModel = Depends(require_owner),
 ):
     queue = find_queue(db, queue_id)
-    check_owner_or_staff(db, user, queue)
+    check_owner(user, queue.business)
 
     updates = data.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nothing to update")
-
-    # Staff can only open / pause / resume / close
-    if not owns_business(user, queue.business) and set(updates) != {"status"}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff can only change the queue status")
 
     new_status = updates.pop("status", None)
 
@@ -240,7 +236,7 @@ def call_next(
     queue_id: int,
     data: Optional[CallNextSchema] = None,
     db: Session = Depends(get_db),
-    user: UserModel = Depends(require_owner_or_staff),
+    user: UserModel = Depends(require_staff),
 ):
     queue = find_queue(db, queue_id)
     check_owner_or_staff(db, user, queue)
@@ -248,8 +244,23 @@ def call_next(
     if queue.status != "open":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Open the queue before calling the next person")
 
-    # Which counter is calling (counter 1 when the body is empty)
-    counter = data.counter_number if data else 1
+    # Staff always serve from the counter assigned by the owner.
+    from models.staff import StaffModel
+
+    assignment = (
+        db.query(StaffModel)
+        .filter(
+            StaffModel.user_id == user.id,
+            StaffModel.branch_id == queue.branch_id,
+            StaffModel.is_active.is_(True),
+        )
+        .first()
+    )
+    if not assignment:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not assigned to this branch")
+
+    counter = assignment.counter_number
+
     if counter > queue.counter_count:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

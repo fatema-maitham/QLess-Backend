@@ -12,6 +12,7 @@ from dependencies.get_current_user import get_current_user
 from dependencies.queue_access import check_owner_or_staff, find_queue, owns_business, works_at_branch
 from dependencies.roles import require_customer, require_owner_or_staff
 from models.queue import QueueModel
+from models.staff import StaffModel
 from models.queue_entry import QueueEntryModel
 from models.user import UserModel
 from realtime.queue_updates import broadcast, queue_message
@@ -311,10 +312,29 @@ def update_queue_entry(
 
     if entry.user_id == user.id:
         customer_update(entry, updates)
-    elif can_manage(db, user, entry):
+    elif user.role.name == "staff" and works_at_branch(db, user, entry.queue.branch_id):
+        assignment = (
+            db.query(StaffModel)
+            .filter(
+                StaffModel.user_id == user.id,
+                StaffModel.branch_id == entry.queue.branch_id,
+                StaffModel.is_active.is_(True),
+            )
+            .first()
+        )
+
+        if not assignment:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not assigned to this branch")
+
+        if entry.counter_number != assignment.counter_number:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This ticket is being served at Counter {entry.counter_number}",
+            )
+
         manager_update(db, entry, updates)
     else:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can't change this ticket")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only assigned staff can update this ticket")
 
     db.commit()
     db.refresh(entry)
