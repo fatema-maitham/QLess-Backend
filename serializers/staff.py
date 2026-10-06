@@ -84,3 +84,4 @@ class StaffMeSchema(BaseModel):
     business: StaffBusinessSchema
     branch: StaffBranchSchema
     queues: List[StaffQueueSchema]
+    queue_id: Optional[int] = None
