@@ -18,6 +18,7 @@ from serializers.staff import (
     StaffSchema,
     StaffUpdateSchema,
 )
+from models.queue import QueueModel
 
 router = APIRouter(tags=["Staff"])
 
