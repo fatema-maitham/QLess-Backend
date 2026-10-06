@@ -495,13 +495,16 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 * As a business owner, I can close a queue.
 * As a business owner, I can delete a queue.
 * As a business owner, I can set queue capacity.
+* As a business owner, I can set the number of service counters for a queue.
 * As a business owner, I can set average service duration.
 * As a business owner, I can configure the no-show grace period.
 * As a business owner, I can add staff members to a branch.
-* As a business owner, I can update staff information.
+* As a business owner, I can assign a staff member to a service counter.
+* As a business owner, I can update a staff member's role and assigned counter.
 * As a business owner, I can deactivate staff members.
-* As a business owner, I can view active queues.
+* As a business owner, I can monitor active queues.
 * As a business owner, I can view customers waiting in queues.
+* As a business owner, I can view customers currently being served at each counter.
 * As a business owner, I can view which customers are on their way.
 * As a business owner, I can view reviews.
 * As a business owner, I can create announcements.
@@ -518,17 +521,20 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 * As a staff member, I can log in and log out.
 * As a staff member, I can view my assigned business.
 * As a staff member, I can view my assigned branch.
+* As a staff member, I can view my role or position.
+* As a staff member, I can view my assigned service counter.
 * As a staff member, I can view branch operating hours.
 * As a staff member, I can view services offered at my branch.
-* As a staff member, I can view all queues belonging to my branch.
+* As a staff member, I can view all queues belonging to my assigned branch.
 * As a staff member, I can view customers waiting in a queue.
 * As a staff member, I can see which customers are on their way.
-* As a staff member, I can call the next customer.
-* As a staff member, I can check in a customer.
-* As a staff member, I can mark a customer as completed.
-* As a staff member, I can mark a customer as a no-show.
-* As a staff member, I can pause a queue.
-* As a staff member, I can resume a queue.
+* As a staff member, I can call the next customer to my assigned counter.
+* As a staff member, I can view the customer currently being served at my assigned counter.
+* As a staff member, I can check in a customer at my assigned counter.
+* As a staff member, I can mark a customer at my assigned counter as completed.
+* As a staff member, I can mark a customer at my assigned counter as a no-show.
+* As a staff member, I can pause an active queue.
+* As a staff member, I can resume a paused queue.
 * As a staff member, I can view queue history.
 * As a staff member, I can view bookings for my branch.
 * As a staff member, I can confirm or complete a booking.
