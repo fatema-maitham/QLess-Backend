@@ -269,34 +269,137 @@ def customer_update(entry: QueueEntryModel, updates: dict):
     entry.checked_in_at = func.now()
 
 
-def manager_update(db: Session, entry: QueueEntryModel, updates: dict):
+def manager_update(
+    db: Session,
+    entry: QueueEntryModel,
+    updates: dict,
+):
     if "on_the_way" in updates:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the customer can mark 'on the way'")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the customer can mark 'on the way'",
+        )
 
     new_status = updates.get("status")
+
     if new_status is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Send a status")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Send a status",
+        )
 
     if entry.status not in MANAGER_MOVES[new_status]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Can't mark a {entry.status} ticket as {new_status}",
+            detail=(
+                f"Can't mark a {entry.status} "
+                f"ticket as {new_status}"
+            ),
         )
+
+    # -----------------------------------------------------
+    # NO-SHOW GRACE PERIOD
+    # -----------------------------------------------------
+    #
+    # Example:
+    #
+    # Customer called:
+    # 10:00
+    #
+    # Queue grace:
+    # 5 minutes
+    #
+    # Staff cannot mark no-show until:
+    # 10:05
+    #
+    # This is checked in the BACKEND,
+    # so React cannot bypass it.
+    # -----------------------------------------------------
+
+    if new_status == "no_show":
+
+        if entry.called_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "This customer has not been called yet"
+                ),
+            )
+
+        grace_minutes = (
+            entry.queue.no_show_grace_minutes or 0
+        )
+
+        # SQLAlchemy/SQLite may return a naive datetime.
+        # Convert safely to UTC-aware datetime.
+        called_at = entry.called_at
+
+        if called_at.tzinfo is None:
+            called_at = called_at.replace(
+                tzinfo=timezone.utc
+            )
+
+        now = datetime.now(
+            timezone.utc
+        )
+
+        allowed_at = (
+            called_at
+            + timedelta(
+                minutes=grace_minutes
+            )
+        )
+
+        if now < allowed_at:
+
+            remaining_seconds = int(
+                (allowed_at - now).total_seconds()
+            )
+
+            # Round up so 1 second remaining
+            # still displays as 1 minute.
+            remaining_minutes = max(
+                1,
+                (
+                    remaining_seconds + 59
+                ) // 60,
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "You can't mark this customer "
+                    "as a no-show yet. "
+                    f"Wait about {remaining_minutes} "
+                    "more minute"
+                    f"{'s' if remaining_minutes != 1 else ''}."
+                ),
+            )
+
+    # -----------------------------------------------------
+    # Change status only AFTER all validation passes
+    # -----------------------------------------------------
 
     entry.status = new_status
 
     if new_status == "checked_in":
+
         entry.checked_in_at = func.now()
 
     elif new_status == "completed":
+
         if entry.checked_in_at is None:
             entry.checked_in_at = func.now()
+
         entry.completed_at = func.now()
 
     elif new_status == "no_show":
-        handle_no_show(db, entry)
 
-
+        handle_no_show(
+            db,
+            entry,
+        )
+        
 @router.patch("/queue-entries/{entry_id}", response_model=QueueEntrySchema)
 def update_queue_entry(
     entry_id: int,

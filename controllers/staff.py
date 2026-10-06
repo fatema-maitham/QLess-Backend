@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from controllers.branches import get_owned_branch
 from database import get_db
 from dependencies.roles import require_owner, require_staff
+from models.queue_entry import QueueEntryModel
 from models.queue import QueueModel
 from models.role import RoleModel
 from models.staff import StaffModel
@@ -20,13 +21,23 @@ from serializers.staff import (
     StaffUpdateSchema,
 )
 
+
 router = APIRouter(tags=["Staff"])
 
 
-def set_role(db: Session, user: UserModel, role_name: str):
-    role = db.query(RoleModel).filter(
-        RoleModel.name == role_name
-    ).first()
+# ---------- helpers ----------
+
+
+def set_role(
+    db: Session,
+    user: UserModel,
+    role_name: str,
+):
+    role = (
+        db.query(RoleModel)
+        .filter(RoleModel.name == role_name)
+        .first()
+    )
 
     if not role:
         raise HTTPException(
@@ -42,9 +53,16 @@ def get_owned_staff(
     db: Session,
     user: UserModel,
 ) -> StaffModel:
-    staff = db.query(StaffModel).filter(
-        StaffModel.id == staff_id
-    ).first()
+    """
+    Find a staff record and make sure
+    the logged-in owner owns its business.
+    """
+
+    staff = (
+        db.query(StaffModel)
+        .filter(StaffModel.id == staff_id)
+        .first()
+    )
 
     if not staff:
         raise HTTPException(
@@ -77,16 +95,74 @@ def has_other_active_assignment(
         is not None
     )
 
+def get_active_ticket_for_staff(
+    db: Session,
+    staff: StaffModel,
+):
+    """
+    Find a called/checked-in ticket currently being
+    served at this staff member's assigned queue and counter.
+    """
 
-def deactivate_staff(db: Session, staff: StaffModel):
+    if not staff.is_active or staff.queue_id is None:
+        return None
+
+    return (
+        db.query(QueueEntryModel)
+        .filter(
+            QueueEntryModel.queue_id == staff.queue_id,
+            QueueEntryModel.counter_number == staff.counter_number,
+            QueueEntryModel.status.in_(["called", "checked_in"]),
+        )
+        .first()
+    )
+
+
+def ensure_not_serving(
+    db: Session,
+    staff: StaffModel,
+):
+    """
+    Do not allow assignment changes or deactivation
+    while the staff member is serving someone.
+    """
+
+    active_ticket = get_active_ticket_for_staff(
+        db,
+        staff,
+    )
+
+    if active_ticket:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This staff member is currently serving "
+                f"ticket #{active_ticket.queue_number} at "
+                f"counter {staff.counter_number}. "
+                "Complete or finish the ticket before "
+                "changing the assignment or deactivating staff."
+            ),
+        )
+
+
+def deactivate_staff(
+    db: Session,
+    staff: StaffModel,
+):
     staff.is_active = False
 
+    # If they don't work anywhere else,
+    # they become a normal customer again.
     if not has_other_active_assignment(
         db,
         staff.user_id,
         staff.id,
     ):
-        set_role(db, staff.user, "customer")
+        set_role(
+            db,
+            staff.user,
+            "customer",
+        )
 
 
 def validate_staff_assignment(
@@ -98,10 +174,14 @@ def validate_staff_assignment(
     if queue_id is None:
         return
 
-    queue = db.query(QueueModel).filter(
-        QueueModel.id == queue_id,
-        QueueModel.branch_id == branch_id,
-    ).first()
+    queue = (
+        db.query(QueueModel)
+        .filter(
+            QueueModel.id == queue_id,
+            QueueModel.branch_id == branch_id,
+        )
+        .first()
+    )
 
     if not queue:
         raise HTTPException(
@@ -116,12 +196,24 @@ def validate_staff_assignment(
         )
 
 
-# Keep /staff/me before /staff/{staff_id}.
-@router.get("/staff/me", response_model=StaffMeSchema)
+# ---------- routes ----------
+# /staff/me must come BEFORE /staff/{staff_id},
+# otherwise "me" is read as an id.
+
+
+@router.get(
+    "/staff/me",
+    response_model=StaffMeSchema,
+)
 def get_me_staff(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_staff),
 ):
+    """
+    The staff member's assigned
+    business, branch and queues.
+    """
+
     staff = (
         db.query(StaffModel)
         .filter(
@@ -172,8 +264,12 @@ def get_staff(
 
     return (
         db.query(StaffModel)
-        .filter(StaffModel.branch_id == branch.id)
-        .order_by(StaffModel.created_at.desc())
+        .filter(
+            StaffModel.branch_id == branch.id
+        )
+        .order_by(
+            StaffModel.created_at.desc()
+        )
         .all()
     )
 
@@ -202,14 +298,21 @@ def create_staff(
         data.counter_number,
     )
 
-    user = db.query(UserModel).filter(
-        UserModel.email == data.user_email
-    ).first()
+    user = (
+        db.query(UserModel)
+        .filter(
+            UserModel.email == data.user_email
+        )
+        .first()
+    )
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account with this email. They need to sign up first.",
+            detail=(
+                "No account with this email. "
+                "They need to sign up first."
+            ),
         )
 
     if user.id == current_user.id:
@@ -218,10 +321,16 @@ def create_staff(
             detail="You can't add yourself as staff",
         )
 
-    if user.role.name not in ("customer", "staff"):
+    if user.role.name not in (
+        "customer",
+        "staff",
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only customer or staff accounts can be added as staff",
+            detail=(
+                "Only customer or staff accounts "
+                "can be added as staff"
+            ),
         )
 
     existing = (
@@ -254,7 +363,11 @@ def create_staff(
         counter_number=data.counter_number,
     )
 
-    set_role(db, user, "staff")
+    set_role(
+        db,
+        user,
+        "staff",
+    )
 
     db.add(staff)
     db.commit()
@@ -295,7 +408,38 @@ def update_staff(
         current_user,
     )
 
-    changes = data.model_dump(exclude_unset=True)
+    changes = data.model_dump(
+        exclude_unset=True
+    )
+
+    # Block assignment changes while the staff member
+    # is actively serving a customer.
+    assignment_changed = (
+        (
+            "counter_number" in changes
+            and changes["counter_number"] != staff.counter_number
+        )
+        or (
+            "queue_id" in changes
+            and changes["queue_id"] != staff.queue_id
+        )
+    )
+
+    if assignment_changed:
+        ensure_not_serving(
+            db,
+            staff,
+        )
+
+    # Deactivation is also blocked while serving.
+    if (
+        changes.get("is_active") is False
+        and staff.is_active
+    ):
+        ensure_not_serving(
+            db,
+            staff,
+        )
 
     if (
         "counter_number" in changes
@@ -310,6 +454,7 @@ def update_staff(
         "queue_id",
         staff.queue_id,
     )
+
     next_counter = changes.get(
         "counter_number",
         staff.counter_number,
@@ -333,7 +478,12 @@ def update_staff(
 
     new_active = changes.get("is_active")
 
-    if new_active is True and not staff.is_active:
+    if (
+        new_active is True
+        and not staff.is_active
+    ):
+        # Reactivating: they cannot already be active
+        # at another branch.
         if has_other_active_assignment(
             db,
             staff.user_id,
@@ -341,20 +491,40 @@ def update_staff(
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This person is already active staff at another branch",
+                detail=(
+                    "This person is already active "
+                    "staff at another branch"
+                ),
             )
 
-        if staff.user.role.name not in ("customer", "staff"):
+        if staff.user.role.name not in (
+            "customer",
+            "staff",
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only customer or staff accounts can be staff",
+                detail=(
+                    "Only customer or staff accounts "
+                    "can be staff"
+                ),
             )
 
         staff.is_active = True
-        set_role(db, staff.user, "staff")
 
-    elif new_active is False and staff.is_active:
-        deactivate_staff(db, staff)
+        set_role(
+            db,
+            staff.user,
+            "staff",
+        )
+
+    elif (
+        new_active is False
+        and staff.is_active
+    ):
+        deactivate_staff(
+            db,
+            staff,
+        )
 
     db.commit()
     db.refresh(staff)
@@ -368,6 +538,12 @@ def delete_staff(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_owner),
 ):
+    """
+    Deactivate (not a real delete).
+    The person goes back to being a customer
+    if they have no other active staff assignment.
+    """
+
     staff = get_owned_staff(
         staff_id,
         db,
@@ -375,7 +551,20 @@ def delete_staff(
     )
 
     if staff.is_active:
-        deactivate_staff(db, staff)
+        # DELETE is another way to deactivate staff,
+        # so it must use the same serving protection.
+        ensure_not_serving(
+            db,
+            staff,
+        )
+
+        deactivate_staff(
+            db,
+            staff,
+        )
+
         db.commit()
 
-    return {"message": "Staff member deactivated"}
+    return {
+        "message": "Staff member deactivated"
+    }
