@@ -49,7 +49,7 @@ class StaffSchema(BaseModel):
     is_active: bool
     created_at: Optional[datetime] = None
     user: StaffUserSchema
-    
+    queue_id: Optional[int] = None
 
 # ----- for GET /staff/me (the staff member's own home page) -----
 
