@@ -10,6 +10,15 @@ class StaffModel(BaseModel):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
+    branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
+
+    queue_id = Column(
+        Integer,
+        ForeignKey("queues.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    position = Column(String)
     position = Column(String)
     counter_number = Column(Integer, default=1, server_default="1", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
