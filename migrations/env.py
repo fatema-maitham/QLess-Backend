@@ -9,13 +9,16 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
-import os 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 database_url = os.environ.get("DATABASE_URL")
 
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
-else: 
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+else:
     raise ValueError("DATABASE_URL environment variable is required")
 
 
