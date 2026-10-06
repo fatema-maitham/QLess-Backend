@@ -36,7 +36,8 @@ def make_open_queue(test_app: TestClient, db: Session, name: str, counters: int,
 
 def test_each_counter_calls_its_own_person(test_app: TestClient, test_db: Session, override_get_db):
     queue_id = make_open_queue(test_app, test_db, "Three Desks", counters=3)
-    staff = login(test_app, "staff@qless.com")
+        queue = test_db.get(QueueModel, queue_id)
+    staff = assigned_staff(test_app, test_db, queue, 1)
     for n in range(1, 5):
         test_app.post(f"/api/queues/{queue_id}/entries", headers=sign_up(test_app, f"desk{n}@test.com"))
 
@@ -51,7 +52,8 @@ def test_each_counter_calls_its_own_person(test_app: TestClient, test_db: Sessio
 
 def test_counter_must_finish_before_calling_again(test_app: TestClient, test_db: Session, override_get_db):
     queue_id = make_open_queue(test_app, test_db, "One At A Time", counters=2)
-    staff = login(test_app, "staff@qless.com")
+        queue = test_db.get(QueueModel, queue_id)
+    staff = assigned_staff(test_app, test_db, queue, 1)
     for n in range(1, 3):
         test_app.post(f"/api/queues/{queue_id}/entries", headers=sign_up(test_app, f"busy{n}@test.com"))
 
