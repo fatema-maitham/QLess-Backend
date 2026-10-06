@@ -22,7 +22,7 @@ class StaffUpdateSchema(BaseModel):
     position: Optional[str] = None
     counter_number: Optional[int] = Field(default=None, ge=1, le=20)
     is_active: Optional[bool] = None
-
+    queue_id: Optional[int] = Field(default=None, gt=0)
 
 class StaffUserSchema(BaseModel):
     """The staff member's basic account info."""
