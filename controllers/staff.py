@@ -104,7 +104,8 @@ def get_me_staff(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You are not assigned to a branch yet")
 
     return StaffMeSchema(
-        id=staff.id,
+    id=staff.id,
+    queue_id=staff.queue_id,
         position=staff.position,
         counter_number=staff.counter_number,
         business=StaffBusinessSchema.model_validate(staff.business),
@@ -204,6 +205,30 @@ def update_staff(
 ):
     staff = get_owned_staff(staff_id, db, current_user)
     changes = data.model_dump(exclude_unset=True)
+    if (
+    "counter_number" in changes
+    and changes["counter_number"] is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Counter cannot be empty",
+        )
+
+    next_queue_id = changes.get("queue_id", staff.queue_id)
+    next_counter = changes.get(
+        "counter_number",
+        staff.counter_number,
+    )
+
+    validate_staff_assignment(
+        db,
+        staff.branch_id,
+        next_queue_id,
+        next_counter,
+    )
+
+if "queue_id" in changes:
+    staff.queue_id = next_queue_id
 
     if "position" in changes:
         staff.position = changes["position"]
