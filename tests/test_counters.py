@@ -6,6 +6,8 @@ from models.branch import BranchModel
 from models.service import ServiceModel
 from tests.lib import login
 
+from models.queue import QueueModel
+from tests.assignment_helpers import assigned_staff
 
 def sign_up(test_app: TestClient, email: str):
     response = test_app.post(
