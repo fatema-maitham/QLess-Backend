@@ -171,11 +171,12 @@ def create_staff(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"This person is already staff at {where}")
 
     staff = StaffModel(
-        user_id=user.id,
-        business_id=branch.business_id,
-        branch_id=branch.id,
-        position=data.position,
-        counter_number=data.counter_number,
+    user_id=user.id,
+    business_id=branch.business_id,
+    branch_id=branch.id,
+    queue_id=data.queue_id,
+    position=data.position,
+    counter_number=data.counter_number,
     )
     set_role(db, user, "staff")
 
