@@ -33,7 +33,7 @@ class StaffUserSchema(BaseModel):
     name: str
     email: str
     phone: Optional[str] = None
-
+    profile_image: Optional[str] = None
 
 class StaffSchema(BaseModel):
     """What the owner sees about a staff member."""
