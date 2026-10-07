@@ -1,10 +1,17 @@
 # serializers/booking.py
+
 from datetime import date, datetime, time
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-BookingStatus = Literal["pending", "confirmed", "completed", "cancelled"]
+
+BookingStatus = Literal[
+    "confirmed",
+    "completed",
+    "cancelled",
+    "no_show",
+]
 
 
 class BookingSchema(BaseModel):
@@ -15,12 +22,14 @@ class BookingSchema(BaseModel):
     business_id: int
     branch_id: int
     service_id: int
+
     booking_date: date
     booking_time: time
-    status: str
+    status: BookingStatus
+
     created_at: Optional[datetime] = None
 
-    # Filled in by the controller
+    # Filled by the controller
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     service_name: Optional[str] = None
@@ -29,13 +38,26 @@ class BookingSchema(BaseModel):
 
 
 class BookingCreateSchema(BaseModel):
-    booking_date: date  # "2026-10-05"
-    booking_time: time  # "10:30"
+    booking_date: date
+    booking_time: time
 
 
 class BookingUpdateSchema(BaseModel):
-    # Customer: booking_date / booking_time (reschedule)
-    # Owner/staff: status
+    # Customer can reschedule.
     booking_date: Optional[date] = None
     booking_time: Optional[time] = None
-    status: Optional[Literal["confirmed", "completed", "cancelled"]] = None
+
+    # Staff can complete / no-show.
+    status: Optional[
+        Literal[
+            "completed",
+            "no_show",
+        ]
+    ] = None
+
+
+class AvailableSlotsSchema(BaseModel):
+    booking_date: date
+    service_id: int
+    duration_minutes: int
+    slots: list[str]
