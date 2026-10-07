@@ -426,6 +426,7 @@ def call_next(
         .filter(
             StaffModel.user_id == user.id,
             StaffModel.branch_id == queue.branch_id,
+            StaffModel.queue_id == queue.id,
             StaffModel.is_active.is_(True),
         )
         .first()
@@ -434,7 +435,7 @@ def call_next(
     if not assignment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not assigned to this branch",
+            detail="You are not assigned to this queue",
         )
 
     counter = assignment.counter_number
@@ -449,15 +450,15 @@ def call_next(
             ),
         )
 
-    # A counter serves one person at a time
+    # A physical counter serves one person at a time across the whole branch.
+    # Join QueueModel so Counter 1 cannot serve Queue A and Queue B simultaneously.
     still_serving = (
         db.query(QueueEntryModel)
+        .join(QueueModel, QueueEntryModel.queue_id == QueueModel.id)
         .filter(
-            QueueEntryModel.queue_id == queue.id,
+            QueueModel.branch_id == queue.branch_id,
             QueueEntryModel.counter_number == counter,
-            QueueEntryModel.status.in_(
-                ["called", "checked_in"]
-            ),
+            QueueEntryModel.status.in_(["called", "checked_in"]),
         )
         .first()
     )
