@@ -18,6 +18,7 @@ class ReviewSchema(BaseModel):
 
     # Filled in by the controller
     author_name: Optional[str] = None
+    author_profile_image: Optional[str] = None
     business_name: Optional[str] = None
 
 
