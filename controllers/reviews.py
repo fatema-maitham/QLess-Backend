@@ -37,10 +37,12 @@ def find_review(db: Session, review_id: int) -> ReviewModel:
 
 def review_out(review: ReviewModel) -> ReviewSchema:
     data = ReviewSchema.model_validate(review)
-    data.author_name = review.user.name
-    data.business_name = review.business.name
-    return data
 
+    data.author_name = review.user.name
+    data.author_profile_image = review.user.profile_image
+    data.business_name = review.business.name
+
+    return data
 
 def has_completed_visit(db: Session, user_id: int, business_id: int) -> bool:
     """True if the user finished a queue ticket or a booking at this business."""

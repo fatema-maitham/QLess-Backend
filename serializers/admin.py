@@ -16,14 +16,14 @@ class AdminUserBriefSchema(BaseModel):
     id: int
     name: str
     email: str
-
+    profile_image: Optional[str] = None
 
 class AdminBusinessBriefSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
-
+    image: Optional[str] = None
 
 # ----- responses -----
 
