@@ -85,6 +85,18 @@ Admins manage the overall platform, including users, businesses, categories, rev
 * Monitor suspicious activity
 * View administrative audit logs
 
+## Queue & Booking Improvements
+
+* Support multiple service counters for each queue.
+* Allow business owners to assign staff members to a specific queue and service counter.
+* Prevent a service counter from calling another customer while it is already serving someone.
+* Prevent staff queue/counter assignments from being changed or removed while the staff member is actively serving a customer.
+* Protect queues with active customers from deletion, including customers with `waiting`, `called`, or `checked_in` status.
+* Validate booking conflicts using the service duration to prevent overlapping appointments.
+* Prevent overlapping bookings for customers and services.
+* Enforce the configured no-show grace period before a customer can be marked as a no-show.
+* Validate required fields and reject invalid or null values.
+
 ---
 
 ## User Roles
@@ -118,6 +130,7 @@ Admins manage the overall platform, including users, businesses, categories, rev
 * JavaScript
 * HTML
 * CSS
+* Cloudinary
 
 ### Development Tools
 
@@ -195,10 +208,12 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 ### Auth Routes
 
-| HTTP Method | Controller | Response | URI             | Role   | Use Case                       |
-| ----------- | ---------- | -------: | --------------- | ------ | ------------------------------ |
-| POST        | sign_up    |      201 | `/auth/sign-up` | Public | Create a new user account      |
-| POST        | sign_in    |      200 | `/auth/sign-in` | Public | Log in and receive a JWT token |
+| HTTP Method | Controller      | Response | URI                     | Role   | Use Case                         |
+| ----------- | --------------- | -------: | ----------------------- | ------ | -------------------------------- |
+| POST        | sign_up         |      201 | `/auth/sign-up`         | Public | Create a new user account        |
+| POST        | sign_in         |      200 | `/auth/sign-in`         | Public | Log in and receive a JWT token   |
+| POST        | forgot_password |      200 | `/auth/forgot-password` | Public | Request a password reset         |
+| POST        | reset_password  |      200 | `/auth/reset-password`  | Public | Reset password using reset token |
 
 ---
 
@@ -573,7 +588,7 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 * SMS and WhatsApp notifications when a customer's turn is near
 * QR code check-in at the branch
-* Email verification and password reset
+* Email verification
 * Arabic language support
 * Map view of nearby branches
 * Online payment for bookings
