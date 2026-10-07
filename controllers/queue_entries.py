@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies.get_current_user import get_current_user
-from dependencies.queue_access import check_owner_or_staff, find_queue, owns_business, works_at_branch
+from dependencies.queue_access import (
+    assigned_to_queue,
+    check_owner_or_staff,
+    find_queue,
+    owns_business,
+)
 from dependencies.roles import require_customer, require_owner_or_staff
 from models.queue import QueueModel
 from models.staff import StaffModel
@@ -49,10 +54,17 @@ def find_entry(db: Session, entry_id: int) -> QueueEntryModel:
     return entry
 
 
-def can_manage(db: Session, user: UserModel, entry: QueueEntryModel) -> bool:
+def can_manage(
+    db: Session,
+    user: UserModel,
+    entry: QueueEntryModel,
+) -> bool:
     queue = entry.queue
-    return owns_business(user, queue.business) or works_at_branch(db, user, queue.branch_id)
 
+    return (
+        owns_business(user, queue.business)
+        or assigned_to_queue(db, user, queue)
+    )
 
 def entry_out(db: Session, entry: QueueEntryModel) -> QueueEntrySchema:
     queue = entry.queue
@@ -415,24 +427,43 @@ def update_queue_entry(
 
     if entry.user_id == user.id:
         customer_update(entry, updates)
-    elif user.role.name == "staff" and works_at_branch(db, user, entry.queue.branch_id):
+    elif (
+        user.role.name == "staff"
+        and assigned_to_queue(
+            db,
+            user,
+            entry.queue,
+        )
+    ):
         assignment = (
             db.query(StaffModel)
             .filter(
                 StaffModel.user_id == user.id,
-                StaffModel.branch_id == entry.queue.branch_id,
+                StaffModel.branch_id
+                == entry.queue.branch_id,
+                StaffModel.queue_id
+                == entry.queue_id,
                 StaffModel.is_active.is_(True),
             )
             .first()
         )
 
         if not assignment:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not assigned to this branch")
-
-        if entry.counter_number != assignment.counter_number:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"This ticket is being served at Counter {entry.counter_number}",
+                detail="You are not assigned to this queue",
+            )
+
+        if (
+            entry.counter_number
+            != assignment.counter_number
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "This ticket is being served at "
+                    f"Counter {entry.counter_number}"
+                ),
             )
 
         manager_update(db, entry, updates)
