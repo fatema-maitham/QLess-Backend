@@ -54,5 +54,9 @@ class BusinessSchema(BaseModel):
     approval_status: str
     rejection_reason: Optional[str] = None
     is_active: bool
+    # Owner subscription (worked out from the payments table)
+    is_paid: bool = False
+    paid_until: Optional[datetime] = None
+    current_plan: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

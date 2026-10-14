@@ -114,6 +114,11 @@ def update_business(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Only draft or rejected businesses can be submitted (current status: {business.approval_status})",
             )
+        if not business.is_paid:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Please pay for a plan before sending your business for approval",
+            )
         business.approval_status = "pending"
         business.rejection_reason = None
 

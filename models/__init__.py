@@ -19,6 +19,7 @@ from . import (
     favorite,
     suspicious_activity,
     audit_log,
+    payment,
 )
 
 __all__ = ["Base", "BaseModel"]

@@ -10,7 +10,9 @@ Customers can discover businesses, select a branch and service, join a virtual q
 
 Business owners can manage their businesses, branches, services, operating hours, queues, staff, bookings, announcements, and queue analytics.
 
-Admins manage the overall platform, including users, businesses, categories, reviews, suspicious activity, and audit logs.
+Business owners pay for a monthly or yearly plan before their business is sent to an admin for approval.
+
+Admins manage the overall platform, including users, businesses, categories, reviews, suspicious activity, payments, and audit logs.
 
 ---
 
@@ -40,7 +42,9 @@ Admins manage the overall platform, including users, businesses, categories, rev
 ### Business Management
 
 * Create and manage businesses
-* Submit businesses for admin approval
+* Pay for a monthly or yearly plan (demo card checkout)
+* Submit businesses for admin approval (only after paying)
+* Extend the plan and view payment history
 * Manage multiple branches
 * Manage branch addresses and contact information
 * Add and manage services
@@ -84,6 +88,8 @@ Admins manage the overall platform, including users, businesses, categories, rev
 * Manage reviews
 * Monitor suspicious activity
 * View administrative audit logs
+* View all owner payments and platform revenue
+* See which businesses have an active plan
 
 ## Queue & Booking Improvements
 
@@ -105,7 +111,7 @@ Admins manage the overall platform, including users, businesses, categories, rev
 | ------------------ | ------------------------------------------------------------------------------------- |
 | **Guest**          | Browse businesses and explore QLess without an account.                           |
 | **Customer**       | Discover businesses, join virtual queues, manage bookings, and receive notifications. |
-| **Business Owner** | Manage businesses, branches, services, queues, staff, bookings, and announcements.    |
+| **Business Owner** | Pay for a plan, then manage businesses, branches, services, queues, staff, bookings, and announcements. |
 | **Staff**          | Manage queues and customers at an assigned branch.                                    |
 | **Admin**          | Manage and monitor the QLess platform, users, businesses, and activity.           |
 
@@ -246,8 +252,21 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 | GET         | get_businesses  |      200 | `/businesses`               | Public         | List approved businesses (`?search=&category_id=`)    |
 | POST        | create_business |      201 | `/businesses`               | Business Owner | Create a business (status starts as `draft`)          |
 | GET         | show_business   |      200 | `/businesses/{business_id}` | Public         | Get a single business                                 |
-| PATCH       | update_business |      200 | `/businesses/{business_id}` | Business Owner | Update info, or submit/resubmit (`approval_status: "pending"`) |
+| PATCH       | update_business |      200 | `/businesses/{business_id}` | Business Owner | Update info, or submit/resubmit (`approval_status: "pending"`). Returns 402 if the plan isn't paid |
 | DELETE      | delete_business |      200 | `/businesses/{business_id}` | Business Owner | Deactivate a business                                 |
+
+---
+
+### Payment Routes
+
+| HTTP Method | Controller       | Response | URI                                     | Role           | Use Case                                                                 |
+| ----------- | ---------------- | -------: | --------------------------------------- | -------------- | ------------------------------------------------------------------------ |
+| GET         | get_plans        |      200 | `/payments/plans`                       | Public         | List plans and prices (monthly, yearly)                                  |
+| GET         | get_subscription |      200 | `/businesses/{business_id}/subscription`| Business Owner | Current plan, paid-until date, and days left                             |
+| GET         | get_payments     |      200 | `/businesses/{business_id}/payments`    | Business Owner | Payment history (receipts), newest first                                 |
+| POST        | pay              |      201 | `/businesses/{business_id}/payments`    | Business Owner | Pay for a plan (`{ plan, card_holder, card_number, exp_month, exp_year, cvc }`). A draft or rejected business is sent for approval. 400 if the card details are incomplete or expired |
+
+Demo checkout: no real money is taken. Any 16-digit card number works (with a future expiry date and a 3 or 4 digit CVC). Only the card brand and last 4 digits are saved.
 
 ---
 
@@ -393,7 +412,7 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 | HTTP Method | Controller                 | Response | URI                                     | Use Case                                              |
 | ----------- | -------------------------- | -------: | --------------------------------------- | ----------------------------------------------------- |
-| GET         | dashboard                  |      200 | `/admin/dashboard`                      | Platform statistics                                   |
+| GET         | dashboard                  |      200 | `/admin/dashboard`                      | Platform statistics, including revenue and active plans |
 | GET         | get_users                  |      200 | `/admin/users`                          | List all users (`?role=&is_active=`)                  |
 | PATCH       | update_user                |      200 | `/admin/users/{user_id}`                | Activate/deactivate, or lift restriction (`restricted_until: null`) |
 | DELETE      | delete_user                |      200 | `/admin/users/{user_id}`                | Delete a user account                                 |
@@ -406,6 +425,7 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 | GET         | get_suspicious_activity    |      200 | `/admin/suspicious-activity`            | List flagged activity (`?status=open`)                |
 | GET         | show_suspicious_activity   |      200 | `/admin/suspicious-activity/{activity_id}` | Get a flagged record                               |
 | PATCH       | update_suspicious_activity |      200 | `/admin/suspicious-activity/{activity_id}` | Mark as reviewed or dismissed                      |
+| GET         | get_payments               |      200 | `/admin/payments`                       | List all owner payments (`?status=paid&search=`)      |
 | GET         | get_audit_logs             |      200 | `/admin/audit-logs`                     | View admin action history                             |
 
 ---
@@ -420,6 +440,8 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 | `BOOKING.status`              | `pending`, `confirmed`, `completed`, `cancelled`            |
 | `SUSPICIOUS_ACTIVITY.status`  | `open`, `reviewed`, `dismissed`                             |
 | `SUSPICIOUS_ACTIVITY.severity`| `low`, `medium`, `high`                                     |
+| `PAYMENT.plan`                | `monthly` (15.000 BHD, 30 days), `yearly` (150.000 BHD, 365 days) |
+| `PAYMENT.status`              | `paid`, `failed`                                            |
 
 ---
 
@@ -492,6 +514,12 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 
 * As a business owner, I can create a business.
 * As a business owner, I can view all my businesses and their status.
+* As a business owner, I can choose a monthly or yearly plan.
+* As a business owner, I can pay for my plan by card.
+* As a business owner, my business is sent for admin approval after I pay.
+* As a business owner, I can see if my plan is active and when it ends.
+* As a business owner, I can extend my plan without losing remaining days.
+* As a business owner, I can view my payment history and receipt numbers.
 * As a business owner, I can submit my business for admin approval.
 * As a business owner, I can view my business approval status.
 * As a business owner, I can see the reason my business was rejected.
@@ -581,6 +609,9 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 * As an admin, I can view accounts flagged for suspicious activity.
 * As an admin, I can mark suspicious activity as reviewed or dismissed.
 * As an admin, I can review audit logs.
+* As an admin, I can see which businesses have paid for a plan and when each plan ends.
+* As an admin, I can view all owner payments, filter paid or failed payments, and search by business, owner, or receipt number.
+* As an admin, I can see total revenue, active plans, plans ending this week, and failed payments on the dashboard.
 
 ---
 
@@ -591,6 +622,8 @@ Auth: JWT bearer token. Logout is handled on the frontend by deleting the token.
 * Email verification
 * Arabic language support
 * Map view of nearby branches
+* Connect a real payment provider (Tap, BenefitPay, or Stripe)
+* Automatic plan renewal and payment reminders
 * Online payment for bookings
 * Charts for queue analytics
 * Mobile app
