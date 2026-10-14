@@ -1,16 +1,17 @@
-from tests.lib import login
+from tests.lib import login, pay_for_business
 
 
 # ---------- helpers ----------
 
 def submit_business(test_app, owner, name):
-    """Create a business and submit it for approval. Returns its id."""
+    """Create a business, pay for it (which submits it for approval). Returns its id."""
     response = test_app.post("/api/businesses", json={"name": name, "category_id": 1}, headers=owner)
     assert response.status_code == 201
     business_id = response.json()["id"]
 
-    response = test_app.patch(f"/api/businesses/{business_id}", json={"approval_status": "pending"}, headers=owner)
-    assert response.status_code == 200
+    pay_for_business(test_app, owner, business_id)
+    response = test_app.get(f"/api/businesses/{business_id}", headers=owner)
+    assert response.json()["approval_status"] == "pending"
     return business_id
 
 

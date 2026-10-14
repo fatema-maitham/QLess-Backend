@@ -30,3 +30,24 @@ def login(test_app: TestClient, email: str, password: str = PASSWORD):
         raise Exception(f"Login failed: {response.json().get('detail', 'Unknown error')}")
 
     return {"Authorization": f"Bearer {response.json()['token']}"}
+
+
+# A test Visa number that passes the card check
+TEST_CARD = {
+    "card_holder": "Test Owner",
+    "card_number": "4242 4242 4242 4242",
+    "exp_month": 12,
+    "exp_year": 2035,
+    "cvc": "123",
+}
+
+
+def pay_for_business(test_app: TestClient, headers, business_id: int, plan: str = "monthly"):
+    """Pay for a plan. Paying also sends a draft business for approval."""
+    response = test_app.post(
+        f"/api/businesses/{business_id}/payments",
+        json={"plan": plan, **TEST_CARD},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.json()
+    return response.json()

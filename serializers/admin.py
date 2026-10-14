@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from serializers.branch import BranchSchema
 from serializers.business import BusinessSchema
+from serializers.payment import PaymentSchema
 
 
 # ----- small "brief" versions shown inside other objects -----
@@ -30,6 +31,13 @@ class AdminBusinessBriefSchema(BaseModel):
 class AdminBusinessSchema(BusinessSchema):
     """A business plus who owns it."""
 
+    owner: AdminUserBriefSchema
+
+
+class AdminPaymentSchema(PaymentSchema):
+    """A payment plus which business and owner it belongs to."""
+
+    business: AdminBusinessBriefSchema
     owner: AdminUserBriefSchema
 
 
@@ -67,6 +75,12 @@ class DashboardSchema(BaseModel):
     bookings_total: int
     reviews_total: int
     open_suspicious_activities: int
+    # Owner plans and payments
+    revenue_total: float = 0
+    paid_payments: int = 0
+    failed_payments: int = 0
+    active_plans: int = 0
+    plans_ending_soon: int = 0
 
 
 # ----- request bodies -----

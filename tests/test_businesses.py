@@ -1,4 +1,4 @@
-from tests.lib import login
+from tests.lib import login, pay_for_business
 
 
 # ---------- helpers ----------
@@ -54,9 +54,15 @@ def test_submit_business_for_approval(test_app, override_get_db):
     owner = login(test_app, "owner@qless.com")
     business = create_business(test_app, owner, "Submit Cafe")
 
+    # Can't submit before paying
     response = test_app.patch(f"/api/businesses/{business['id']}", json={"approval_status": "pending"}, headers=owner)
-    assert response.status_code == 200
+    assert response.status_code == 402
+
+    # Paying sends it for approval
+    pay_for_business(test_app, owner, business["id"])
+    response = test_app.get(f"/api/businesses/{business['id']}", headers=owner)
     assert response.json()["approval_status"] == "pending"
+    assert response.json()["is_paid"] is True
 
     # Can't submit twice
     response = test_app.patch(f"/api/businesses/{business['id']}", json={"approval_status": "pending"}, headers=owner)

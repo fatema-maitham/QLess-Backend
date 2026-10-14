@@ -1,4 +1,5 @@
 # controllers/admin.py
+from datetime import timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,7 +12,9 @@ from models.audit_log import AuditLogModel
 from models.booking import BookingModel
 from models.branch import BranchModel
 from models.business import BusinessModel
+from models.business import utc_now
 from models.notification import NotificationModel
+from models.payment import PaymentModel
 from models.queue import QueueModel
 from models.queue_entry import QueueEntryModel
 from models.review import ReviewModel
@@ -23,6 +26,7 @@ from serializers.admin import (
     AdminBranchUpdateSchema,
     AdminBusinessSchema,
     AdminBusinessUpdateSchema,
+    AdminPaymentSchema,
     AdminUserUpdateSchema,
     AuditLogSchema,
     DashboardSchema,
@@ -58,6 +62,22 @@ def get_user_or_404(db: Session, user_id: int) -> UserModel:
     return user
 
 
+def plan_counts(db: Session):
+    """How many businesses have an active plan, and how many end in the next 7 days."""
+    now = utc_now()
+    soon = now + timedelta(days=7)
+    last_days = (
+        db.query(func.max(PaymentModel.period_end))
+        .filter(PaymentModel.status == "paid")
+        .group_by(PaymentModel.business_id)
+        .all()
+    )
+    ends = [end for (end,) in last_days if end is not None]
+    active = sum(1 for end in ends if end > now)
+    ending_soon = sum(1 for end in ends if now < end <= soon)
+    return active, ending_soon
+
+
 # ---------- dashboard ----------
 
 @router.get("/dashboard", response_model=DashboardSchema)
@@ -73,6 +93,7 @@ def dashboard(
     )
 
     businesses_by_status = {"draft": 0, "pending": 0, "approved": 0, "rejected": 0}
+    active_plans, plans_ending_soon = plan_counts(db)
     for status_name, total in (
         db.query(BusinessModel.approval_status, func.count(BusinessModel.id))
         .group_by(BusinessModel.approval_status)
@@ -97,6 +118,16 @@ def dashboard(
         "open_suspicious_activities": count(
             db, SuspiciousActivityModel.id, SuspiciousActivityModel.status == "open"
         ),
+        "revenue_total": float(
+            db.query(func.coalesce(func.sum(PaymentModel.amount), 0))
+            .filter(PaymentModel.status == "paid")
+            .scalar()
+            or 0
+        ),
+        "paid_payments": count(db, PaymentModel.id, PaymentModel.status == "paid"),
+        "failed_payments": count(db, PaymentModel.id, PaymentModel.status == "failed"),
+        "active_plans": active_plans,
+        "plans_ending_soon": plans_ending_soon,
     }
 
 
@@ -247,6 +278,39 @@ def update_business_status(
     db.commit()
     db.refresh(business)
     return business
+
+
+# ---------- payments ----------
+
+@router.get("/payments", response_model=List[AdminPaymentSchema])
+def get_payments(
+    payment_status: Optional[str] = Query(default=None, alias="status"),
+    search: Optional[str] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    admin: UserModel = Depends(require_admin),
+):
+    """Every owner payment on the platform, newest first. status: paid | failed"""
+    query = db.query(PaymentModel).join(PaymentModel.business).join(PaymentModel.owner)
+
+    if payment_status:
+        query = query.filter(PaymentModel.status == payment_status)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                BusinessModel.name.ilike(term),
+                UserModel.name.ilike(term),
+                UserModel.email.ilike(term),
+                PaymentModel.reference.ilike(term),
+            )
+        )
+
+    return (
+        query.order_by(PaymentModel.created_at.desc(), PaymentModel.id.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 # ---------- branches ----------
